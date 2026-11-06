@@ -55,7 +55,7 @@ if(DFD_BUILD_PLUGIN)
         NEEDS_MIDI_OUTPUT FALSE
         IS_MIDI_EFFECT FALSE
         EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-        COPY_PLUGIN_AFTER_BUILD FALSE
+        COPY_PLUGIN_AFTER_BUILD TRUE
         VST3_CATEGORIES Fx Delay)
 
     target_sources(DamnFineDelay PRIVATE src/plugin/PluginProcessor.cpp src/plugin/PluginEditor.cpp)
