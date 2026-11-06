@@ -31,19 +31,22 @@ private:
     dfd::ui::SignalDiagram diagram;
     dfd::ui::LevelMeterBay inMeters { true }, outMeters { false };
     dfd::ui::VuMeter vu;
-    std::array<Knob, 6> knobs;
+    std::array<Knob, 10> knobs; // 0-5 normal mode, 6-9 doubler (dry pan, dry level, delay pan, delay level)
     dfd::ui::ToggleSwitch color { { "A", "B" } }, wetOnly { { "ON", "OFF" } };
     dfd::ui::ToggleSwitch noise { { "XTRA", "AUTH", "OFF" } }, quality { { "4x", "2x", "1x" } };
     dfd::ui::ToggleSwitch meterSelect { { "A", "B" } };
+    dfd::ui::ToggleSwitch modeSwitch { { "DOUBLE", "NORMAL" } };
     dfd::ui::RotarySelector routing;
     dfd::ui::PilotLamp lamp;
 
     std::uint32_t lastBlocks = 0;
     double lastActiveMs = -1e9, lastTickMs = 0.0;
     bool sizeRestored = false;
+    int shownMode = -1;
 
     void timerCallback() override;
     void addKnob (Knob&, const char* paramId, dfd::ui::layout::KnobSpot);
+    void showMode (bool doubler);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DamnFineDelayEditor)
 };

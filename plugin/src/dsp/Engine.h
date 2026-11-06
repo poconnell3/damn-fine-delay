@@ -30,6 +30,13 @@ struct EngineParams
     double levelADb = 0.0, levelBDb = 0.0;
     double outputDb = 0.0;
     NoiseMode noise = NoiseMode::Authentic;
+
+    /** Doubler mode: the dry signal and the 30 ms cascade are mixed as two mono sources, each with its own
+        pan (-1 = left, +1 = right, constant power) and level. Mix and Level A/B are ignored; routing should be Cascade. */
+    bool doubler = false;
+    double dryPan = -0.6, wetPan = 0.6;
+    double dryLevelDb = 0.0, wetLevelDb = 0.0;
+
     bool nonlinear = true;
     bool crosstalk = true;
 };
@@ -81,6 +88,8 @@ private:
     bool wetCleared = false;
     Cascade leakAtoB, leakBtoA;
     Smoothed drive, mix, levelA, levelB, output;
+    Smoothed doublerAmount, dryPan, wetPan, dryLevel, wetLevel;
+    bool monoOutput = false;
     std::array<double, 4> bufA {}, bufB {};
 
     void applyRoutingDelays (bool immediate) noexcept;

@@ -113,7 +113,7 @@ void Faceplate::paintStatic (juce::Graphics& g)
     bay (g, inBay.toFloat(), "INPUT");
     bay (g, outBay.toFloat(), "OUTPUT");
 
-    for (auto [plate, seed] : { std::pair { leftPlate, 11 }, std::pair { rightPlate, 23 } })
+    for (auto [plate, seed] : { std::pair { doublerPlate, 5 }, std::pair { leftPlate, 11 }, std::pair { rightPlate, 23 } })
     {
         const auto r = plate.toFloat();
         g.setColour (juce::Colours::black.withAlpha (0.6f));
@@ -129,6 +129,19 @@ void Faceplate::paintStatic (juce::Graphics& g)
     silkText (g, "DAMN FINE AUDIO", lp.withY (lp.getBottom() - 30.0f).withHeight (18.0f), 13.0f);
     thumbScrew (g, { lp.getX() + 13.0f, lp.getCentreY() });
     thumbScrew (g, { lp.getRight() - 13.0f, lp.getCentreY() });
+
+    // Doubler plate: mode switch, then pan over level for the dry signal and the 30 ms cascade.
+    const auto dp = doublerPlate.toFloat();
+    for (auto c : { juce::Point<float> (dp.getCentreX(), dp.getY() + 9.0f), juce::Point<float> (dp.getCentreX(), dp.getBottom() - 9.0f) })
+        drawScrew (g, c, 3.5f);
+    silkText (g, "MODE", titleAbove (modeSwitch), 10.0f, juce::Justification::centredLeft);
+    silkText (g, "DRY", dryHeader, 12.0f, juce::Justification::centred, colours::amberDim);
+    silkText (g, "30 MS", wetHeader, 12.0f, juce::Justification::centred, colours::amberDim);
+    g.setColour (colours::silkDim);
+    g.drawHorizontalLine ((int) dryHeader.getY() - 7, dp.getX() + 12.0f, dp.getRight() - 12.0f);
+    g.drawVerticalLine ((int) dp.getCentreX(), dryHeader.getY(), dp.getBottom() - 22.0f);
+    for (auto k : { dryPan, dryLevel, wetPan, wetLevel })
+        silkText (g, k.label, knobLabel (k), 9.5f, juce::Justification::centred, colours::silkDim);
 
     const auto rp = rightPlate.toFloat();
     for (auto c : { rp.getTopLeft() + juce::Point<float> (9.0f, 9.0f), rp.getTopRight() + juce::Point<float> (-9.0f, 9.0f),
@@ -152,6 +165,8 @@ namespace
 {
 constexpr float kRowA = 58.0f, kRowB = 142.0f, kMid = 100.0f;
 constexpr float kTerm = 44.0f, kSplit = 54.0f, kPot = 62.0f, kAmp = 92.0f, kTube = 122.0f, kTubeEnd = 214.0f, kAmp2 = 222.0f, kOut = 258.0f;
+constexpr float kReturn = kAmp2 + 24.0f; // cascade: A's output turns back to feed B
+constexpr float kDryRail = 14.0f, kPanBox = 250.0f, kPanBoxW = 18.0f, kMixOut = 278.0f;
 constexpr float kStroke = 1.4f;
 
 double delayMs (double tauNominal, double tempC)
@@ -237,6 +252,44 @@ void SignalDiagram::setState (const State& s)
     }
 }
 
+void SignalDiagram::paintDoubler (juce::Graphics& g, double msA, double msB)
+{
+    const bool monoIn = state.numIn == 1, monoOut = state.numOut == 1;
+    g.setColour (colours::silk);
+
+    // Input feeds both the cascade (A into B) and the dry rail across the top.
+    wire (g, { { kTerm, kRowA }, { kPot - 8.0f, kRowA } });
+    wire (g, { { kSplit, kRowA }, { kSplit, kDryRail }, { kPanBox + kPanBoxW * 0.5f, kDryRail }, { kPanBox + kPanBoxW * 0.5f, kRowA - 14.0f } });
+    wire (g, { { kAmp2 + 20.0f, kRowA }, { kReturn, kRowA }, { kReturn, kMid }, { kSplit, kMid }, { kSplit, kRowB }, { kPot - 8.0f, kRowB } });
+    wire (g, { { kAmp2 + 20.0f, kRowB }, { kPanBox, kRowB } });
+    junction (g, { kSplit, kRowA });
+    terminal (g, { kTerm, kRowA });
+    twoLineLabel (g, { 0.0f, kRowA - 12.0f, kTerm - 7.0f, 24.0f }, "IN", monoIn ? "MONO" : "L + R", juce::Justification::centredRight);
+    silkText (g, "DRY", { kTube, kDryRail - 12.0f, kTubeEnd - kTube, 10.0f }, 8.5f);
+
+    // Pan and level block, then the two outputs.
+    const auto box = juce::Rectangle<float> (kPanBox, kRowA - 14.0f, kPanBoxW, kRowB - kRowA + 28.0f);
+    g.drawRect (box, kStroke);
+    for (int i = 0; i < 3; ++i)
+        silkText (g, juce::String::charToString ("PAN"[i]), { box.getX(), box.getCentreY() - 17.0f + 12.0f * (float) i, box.getWidth(), 10.0f }, 8.5f);
+
+    auto sources = [] (bool dry, bool wet) { return dry && wet ? juce::String ("DRY+DLY") : dry ? juce::String ("DRY") : wet ? juce::String ("DLY") : juce::String ("-"); };
+    const juce::String leftSub = monoOut ? "MONO" : sources (state.dryPan <= 0.0f, state.wetPan <= 0.0f);
+    const juce::String rightSub = monoOut ? "UNUSED" : sources (state.dryPan >= 0.0f, state.wetPan >= 0.0f);
+    for (auto [y, name, sub] : { std::tuple { kRowA, "L", leftSub }, std::tuple { kRowB, "R", rightSub } })
+    {
+        g.setColour (colours::silk);
+        wire (g, { { box.getRight(), y }, { kMixOut, y } });
+        terminal (g, { kMixOut, y });
+        silkText (g, name, { kMixOut + 7.0f, y - 12.0f, 40.0f, 12.0f }, 9.5f, juce::Justification::centredLeft);
+        silkText (g, sub, { kMixOut + 7.0f, y, 40.0f, 11.0f }, 7.5f, juce::Justification::centredLeft, colours::silkDim, false);
+    }
+
+    const auto dashedBox = juce::Rectangle<float> (kTube - 8.0f, kRowA - 28.0f, kTubeEnd - kTube + 16.0f, kRowB - kRowA + 50.0f);
+    silkText (g, "DOUBLER  DRY AND " + juce::String (msA + msB, 1) + " ms", dashedBox.withY (dashedBox.getBottom() + 5.0f).withHeight (12.0f).expanded (30.0f, 0.0f),
+              8.5f, juce::Justification::centred, colours::silkDim, false);
+}
+
 void SignalDiagram::paint (juce::Graphics& g)
 {
     const double t = state.temperatureC;
@@ -259,6 +312,11 @@ void SignalDiagram::paint (juce::Graphics& g)
     line (g, kRowA, msA, "A");
     line (g, kRowB, msB, "B");
     g.setColour (colours::silk);
+    if (state.doubler)
+    {
+        paintDoubler (g, msA, msB);
+        return;
+    }
 
     const juce::String bothIn = monoIn ? "MONO" : "L + R";
     switch (state.routing)
@@ -274,7 +332,7 @@ void SignalDiagram::paint (juce::Graphics& g)
             break;
         case 2: // cascade: A's output feeds B
             wire (g, { { kTerm, kRowA }, { kPot - 8.0f, kRowA } });
-            wire (g, { { kAmp2 + 20.0f, kRowA }, { kOut - 8.0f, kRowA }, { kOut - 8.0f, kMid }, { kSplit, kMid }, { kSplit, kRowB }, { kPot - 8.0f, kRowB } });
+            wire (g, { { kAmp2 + 20.0f, kRowA }, { kReturn, kRowA }, { kReturn, kMid }, { kSplit, kMid }, { kSplit, kRowB }, { kPot - 8.0f, kRowB } });
             terminal (g, { kTerm, kRowA });
             leftLabel (kRowA, "IN", bothIn);
             break;

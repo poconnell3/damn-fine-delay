@@ -27,6 +27,8 @@ public:
         int routing = 0; // 0 widener, 1 dual mono, 2 cascade
         float temperatureC = 20.0f;
         int numIn = 2, numOut = 2;
+        bool doubler = false;
+        float dryPan = -0.6f, wetPan = 0.6f; // -1 left .. +1 right
         bool operator== (const State&) const = default;
     };
 
@@ -36,5 +38,7 @@ public:
 
 private:
     State state;
+
+    void paintDoubler (juce::Graphics&, double msA, double msB);
 };
 } // namespace dfd::ui

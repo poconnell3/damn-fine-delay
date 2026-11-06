@@ -17,6 +17,11 @@ inline constexpr auto output = "output";
 inline constexpr auto noise = "noise";
 inline constexpr auto quality = "quality";
 inline constexpr auto temperature = "temperature";
+inline constexpr auto doubler = "doubler";
+inline constexpr auto dryPan = "dryPan";
+inline constexpr auto dryLevel = "dryLevel";
+inline constexpr auto wetPan = "wetPan";
+inline constexpr auto wetLevel = "wetLevel";
 } // namespace ParamIds
 
 class DamnFineDelayProcessor final : public juce::AudioProcessor,
@@ -103,6 +108,11 @@ private:
         std::atomic<float>* noise;
         std::atomic<float>* quality;
         std::atomic<float>* temperature;
+        std::atomic<float>* doubler;
+        std::atomic<float>* dryPan;
+        std::atomic<float>* dryLevel;
+        std::atomic<float>* wetPan;
+        std::atomic<float>* wetLevel;
     } raw {};
 
     dfd::EngineSetup currentSetup() const;

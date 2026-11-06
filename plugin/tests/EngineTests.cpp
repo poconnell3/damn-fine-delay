@@ -371,6 +371,54 @@ void testBypass()
     }
 }
 
+void testDoubler()
+{
+    std::puts ("doubler (dry and 30 ms cascade as two panned sources, constant-power pan, mono fold-down)");
+    auto params = [] (double dryPan, double wetPan, double dryDb, double wetDb)
+    {
+        EngineParams p = linearParams (Color::B, Routing::Cascade);
+        p.doubler = true;
+        p.dryPan = dryPan;
+        p.wetPan = wetPan;
+        p.dryLevelDb = dryDb;
+        p.wetLevelDb = wetDb;
+        return p;
+    };
+    auto peak = [] (const std::vector<double>& y, size_t from, size_t to)
+    {
+        double m = 0.0;
+        for (size_t i = from; i < std::min (to, y.size()); ++i)
+            m = std::max (m, std::abs (y[i]));
+        return m;
+    };
+    const size_t tap = (size_t) std::lround ((Engine::kTauA + Engine::kTauB) * 48000.0);
+
+    // Hard pans: the dry impulse only on the left at t = 0, the cascade only on the right around 30 ms.
+    Run h = impulse (48000.0, EngineSetup {}, params (-1.0, 1.0, 0.0, 0.0), 0.1);
+    check (std::abs (h.left[0] - 1.0) < 1e-9 && std::abs (h.right[0]) < 1e-9, fmt ("hard left dry: L %.3f, R %.3f", h.left[0], h.right[0]));
+    check (peak (h.left, 1, h.left.size()) < 1e-9, fmt ("nothing else on the left (peak %.1e)", peak (h.left, 1, h.left.size())));
+    check (peak (h.right, tap - 40, tap + 40) > 0.2 && peak (h.right, 0, tap - 200) < 1e-6,
+           fmt ("cascade on the right at 30 ms (peak %.3f, before %.1e)", peak (h.right, tap - 40, tap + 40), peak (h.right, 0, tap - 200)));
+
+    // Centre pan is -3 dB per side; level knobs scale each source independently.
+    Run c = impulse (48000.0, EngineSetup {}, params (0.0, 1.0, -6.0, 0.0), 0.05);
+    const double expect = std::pow (10.0, -6.0 / 20.0) * std::sqrt (0.5);
+    check (std::abs (c.left[0] - expect) < 1e-9 && std::abs (c.right[0] - expect) < 1e-9,
+           fmt ("centred dry at -6 dB: L %.4f, R %.4f (expected %.4f)", c.left[0], c.right[0], expect));
+
+    // Mono output ignores the pans and keeps both sources.
+    EngineParams p = params (-1.0, 1.0, 0.0, 0.0);
+    p.noise = NoiseMode::Off;
+    Engine e;
+    e.prepare (48000.0, EngineSetup {}, p);
+    std::vector<float> mono (4800, 0.0f);
+    mono[100] = 1.0f;
+    e.process (mono.data(), nullptr, (int) mono.size());
+    std::vector<double> y (mono.begin() + 100 + e.latencySamples(), mono.end());
+    check (std::abs (y[0] - 1.0) < 1e-6 && peak (y, tap - 40, tap + 40) > 0.2,
+           fmt ("mono output: dry %.3f, cascade peak %.3f", y[0], peak (y, tap - 40, tap + 40)));
+}
+
 void testStress()
 {
     std::puts ("automation stress (no NaN/Inf, bounded output, smooth color/routing switches)");
@@ -390,6 +438,9 @@ void testStress()
         p.routing = static_cast<Routing> ((block / 101) % 3);
         p.noise = static_cast<NoiseMode> ((block / 53) % 3);
         p.levelADb = -10.0 + 10.0 * std::sin (block * 0.02);
+        p.doubler = (block / 71) % 2 == 1;
+        p.dryPan = std::sin (block * 0.013);
+        p.wetPan = -p.dryPan;
         e.setParams (p);
         for (int i = 0; i < 64; ++i)
         {
@@ -416,6 +467,7 @@ int main (int argc, char** argv)
     testDistortion();
     testNoiseAndCrosstalk();
     testBypass();
+    testDoubler();
     testStress();
     std::printf ("%d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

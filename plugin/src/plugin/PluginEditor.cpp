@@ -44,11 +44,18 @@ DamnFineDelayEditor::DamnFineDelayEditor (DamnFineDelayProcessor& p)
     addKnob (knobs[3], ParamIds::mix, layout::mix);
     addKnob (knobs[4], ParamIds::output, layout::output);
     addKnob (knobs[5], ParamIds::temperature, layout::temperature);
+    addKnob (knobs[6], ParamIds::dryPan, layout::dryPan);
+    addKnob (knobs[7], ParamIds::dryLevel, layout::dryLevel);
+    addKnob (knobs[8], ParamIds::wetPan, layout::wetPan);
+    addKnob (knobs[9], ParamIds::wetLevel, layout::wetLevel);
 
     color.attach (*apvts.getParameter (ParamIds::color), { 0, 1 });
     wetOnly.attach (*apvts.getParameter (ParamIds::wetOnly), { 1, 0 });
     noise.attach (*apvts.getParameter (ParamIds::noise), { 2, 1, 0 });
     quality.attach (*apvts.getParameter (ParamIds::quality), { 2, 1, 0 });
+    modeSwitch.attach (*apvts.getParameter (ParamIds::doubler), { 1, 0 });
+    modeSwitch.setBounds (layout::modeSwitch);
+    face.addAndMakeVisible (modeSwitch);
     meterSelect.setPosition ((int) apvts.state.getProperty (kMeterChannel, 0), juce::dontSendNotification);
     meterSelect.onChange = [&apvts] (int pos) { apvts.state.setProperty (kMeterChannel, pos, nullptr); };
 
@@ -86,13 +93,30 @@ DamnFineDelayEditor::~DamnFineDelayEditor()
 
 void DamnFineDelayEditor::addKnob (Knob& k, const char* paramId, layout::KnobSpot spot)
 {
-    k.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 80, 16);
-    k.slider.setBounds (layout::knobBounds (spot));
+    const auto bounds = layout::knobBounds (spot);
+    k.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, bounds.getWidth(), 16);
+    k.slider.setBounds (bounds);
     k.slider.setTitle (spot.label);
     face.addAndMakeVisible (k.slider);
     k.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.state(), paramId, k.slider);
     if (auto* param = processor.state().getParameter (paramId))
         k.slider.setDoubleClickReturnValue (true, param->convertFrom0to1 (param->getDefaultValue()));
+}
+
+void DamnFineDelayEditor::showMode (bool doubler)
+{
+    // Doubler mode mixes with its own pan and level knobs; the normal mix controls and routing do nothing there.
+    auto setActive = [] (juce::Component& c, bool active)
+    {
+        c.setEnabled (active);
+        c.setAlpha (active ? 1.0f : 0.35f);
+    };
+    for (size_t i : { 0u, 1u, 3u })
+        setActive (knobs[i].slider, ! doubler);
+    for (size_t i = 6; i < knobs.size(); ++i)
+        setActive (knobs[i].slider, doubler);
+    setActive (wetOnly, ! doubler);
+    setActive (routing, ! doubler);
 }
 
 void DamnFineDelayEditor::resized()
@@ -117,7 +141,13 @@ void DamnFineDelayEditor::timerCallback()
     outMeters.update ({ out0.peak, out1.peak }, dt);
 
     auto& apvts = processor.state();
-    const int route = juce::roundToInt (apvts.getRawParameterValue (ParamIds::routing)->load());
+    const bool doubler = apvts.getRawParameterValue (ParamIds::doubler)->load() >= 0.5f;
+    if ((int) doubler != shownMode)
+    {
+        shownMode = (int) doubler;
+        showMode (doubler);
+    }
+    const int route = doubler ? 2 : juce::roundToInt (apvts.getRawParameterValue (ParamIds::routing)->load());
     const auto outs = outputLabels (numOut, route);
     inMeters.setChannelLabels (inputLabels (numIn, route));
     outMeters.setChannelLabels (outs);
@@ -126,7 +156,8 @@ void DamnFineDelayEditor::timerCallback()
     vu.update (vuChannel == 0 ? out0.rms : out1.rms, dt);
     vu.setChannelName (outs[vuChannel]);
 
-    diagram.setState ({ route, apvts.getRawParameterValue (ParamIds::temperature)->load(), numIn, numOut });
+    diagram.setState ({ route, apvts.getRawParameterValue (ParamIds::temperature)->load(), numIn, numOut, doubler,
+                        apvts.getRawParameterValue (ParamIds::dryPan)->load() / 100.0f, apvts.getRawParameterValue (ParamIds::wetPan)->load() / 100.0f });
 
     const auto blocks = m.processedBlocks.load();
     if (blocks != lastBlocks)

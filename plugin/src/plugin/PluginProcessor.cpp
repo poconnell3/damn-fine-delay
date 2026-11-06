@@ -22,6 +22,25 @@ void atomicAdd (std::atomic<float>& a, float v) noexcept
     }
 }
 
+/** Pan as L100..C..R100. */
+juce::AudioParameterFloatAttributes panAttributes()
+{
+    return juce::AudioParameterFloatAttributes()
+        .withStringFromValueFunction ([] (float v, int)
+        {
+            const int n = juce::roundToInt (v);
+            return n == 0 ? juce::String ("C") : (n < 0 ? "L" : "R") + juce::String (std::abs (n));
+        })
+        .withValueFromStringFunction ([] (const juce::String& text)
+        {
+            const auto t = text.trim().toUpperCase();
+            const float n = (float) t.retainCharacters ("0123456789.").getFloatValue();
+            return t.startsWith ("L") ? -n : (t.startsWith ("R") ? n : (t.startsWith ("C") ? 0.0f : t.getFloatValue()));
+        });
+}
+
+float levelDb (const std::atomic<float>* raw) { return raw->load() <= -47.95f ? -300.0f : raw->load(); }
+
 juce::AudioParameterFloatAttributes dbAttributes()
 {
     return juce::AudioParameterFloatAttributes()
@@ -56,6 +75,11 @@ APVTS::ParameterLayout DamnFineDelayProcessor::createLayout()
                                                        NormalisableRange<float> { 15.0f, 30.0f, 0.1f }, 20.0f,
                                                        AudioParameterFloatAttributes().withAutomatable (false).withLabel ("C").withStringFromValueFunction (
                                                            [] (float v, int) { return String (v, 1) + " C"; })));
+    layout.add (std::make_unique<AudioParameterBool> (ParameterID { ParamIds::doubler, 3 }, "Double Mode", false));
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::dryPan, 3 }, "Dry Pan", NormalisableRange<float> { -100.0f, 100.0f, 1.0f }, -60.0f, panAttributes()));
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::dryLevel, 3 }, "Dry Level", dbRange (-48.0f, 10.0f), 0.0f, dbAttributes()));
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::wetPan, 3 }, "Delay Pan", NormalisableRange<float> { -100.0f, 100.0f, 1.0f }, 60.0f, panAttributes()));
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::wetLevel, 3 }, "Delay Level", dbRange (-48.0f, 10.0f), 0.0f, dbAttributes()));
     return layout;
 }
 
@@ -76,6 +100,11 @@ DamnFineDelayProcessor::DamnFineDelayProcessor()
     raw.noise = apvts.getRawParameterValue (ParamIds::noise);
     raw.quality = apvts.getRawParameterValue (ParamIds::quality);
     raw.temperature = apvts.getRawParameterValue (ParamIds::temperature);
+    raw.doubler = apvts.getRawParameterValue (ParamIds::doubler);
+    raw.dryPan = apvts.getRawParameterValue (ParamIds::dryPan);
+    raw.dryLevel = apvts.getRawParameterValue (ParamIds::dryLevel);
+    raw.wetPan = apvts.getRawParameterValue (ParamIds::wetPan);
+    raw.wetLevel = apvts.getRawParameterValue (ParamIds::wetLevel);
     apvts.addParameterListener (ParamIds::quality, this);
     apvts.addParameterListener (ParamIds::temperature, this);
 }
@@ -102,10 +131,17 @@ dfd::EngineParams DamnFineDelayProcessor::currentParams() const
     p.color = (int) raw.color->load() == 0 ? dfd::Color::A : dfd::Color::B;
     p.driveDb = raw.drive->load();
     p.mix = raw.wetOnly->load() >= 0.5f ? 1.0 : raw.mix->load() / 100.0;
-    p.levelADb = raw.levelA->load() <= -47.95f ? -300.0 : raw.levelA->load();
-    p.levelBDb = raw.levelB->load() <= -47.95f ? -300.0 : raw.levelB->load();
+    p.levelADb = levelDb (raw.levelA);
+    p.levelBDb = levelDb (raw.levelB);
     p.outputDb = raw.output->load();
     p.noise = static_cast<dfd::NoiseMode> (juce::jlimit (0, 2, (int) raw.noise->load()));
+    p.doubler = raw.doubler->load() >= 0.5f;
+    if (p.doubler)
+        p.routing = dfd::Routing::Cascade;
+    p.dryPan = raw.dryPan->load() / 100.0;
+    p.wetPan = raw.wetPan->load() / 100.0;
+    p.dryLevelDb = levelDb (raw.dryLevel);
+    p.wetLevelDb = levelDb (raw.wetLevel);
     return p;
 }
 
