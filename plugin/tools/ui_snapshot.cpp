@@ -1,5 +1,5 @@
 // Renders the editor to a PNG after feeding it test audio, so the panel can be checked without a host.
-// Usage: dfd_ui_snapshot out.png [scale] [routing 0-2] [numIn 1-2] [numOut 1-2] [doubler 0-1]
+// Usage: dfd_ui_snapshot out.png [scale] [routing 0-2] [numIn 1-2] [numOut 1-2] [doubler 0-1] [human 0-1]
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -9,7 +9,7 @@ int main (int argc, char** argv)
 {
     if (argc < 2)
     {
-        std::fprintf (stderr, "usage: %s out.png [scale] [routing] [numIn] [numOut] [doubler]\n", argv[0]);
+        std::fprintf (stderr, "usage: %s out.png [scale] [routing] [numIn] [numOut] [doubler] [human]\n", argv[0]);
         return 1;
     }
     juce::ScopedJuceInitialiser_GUI init;
@@ -17,6 +17,7 @@ int main (int argc, char** argv)
     const int routing = argc > 3 ? std::atoi (argv[3]) : 0;
     const int numIn = argc > 4 ? std::atoi (argv[4]) : 2, numOut = argc > 5 ? std::atoi (argv[5]) : 2;
     const bool doubler = argc > 6 && std::atoi (argv[6]) != 0;
+    const bool human = argc > 7 && std::atoi (argv[7]) != 0;
 
     std::unique_ptr<juce::AudioProcessor> proc (createPluginFilter());
     auto layout = proc->getBusesLayout();
@@ -30,8 +31,12 @@ int main (int argc, char** argv)
     if (auto* p = dynamic_cast<juce::RangedAudioParameter*> (proc->getParameters()[0]))
         p->setValueNotifyingHost (p->convertTo0to1 ((float) routing));
     for (auto* p : proc->getParameters())
+    {
         if (p->getName (64) == "Double Mode")
             p->setValueNotifyingHost (doubler ? 1.0f : 0.0f);
+        if (p->getName (64) == "Persona")
+            p->setValueNotifyingHost (human ? 1.0f : 0.0f);
+    }
     proc->prepareToPlay (48000.0, 512);
 
     std::unique_ptr<juce::AudioProcessorEditor> editor (proc->createEditor());

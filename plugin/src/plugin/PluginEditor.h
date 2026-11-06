@@ -31,11 +31,12 @@ private:
     dfd::ui::SignalDiagram diagram;
     dfd::ui::LevelMeterBay inMeters { true }, outMeters { false };
     dfd::ui::VuMeter vu;
-    std::array<Knob, 10> knobs; // 0-5 normal mode, 6-9 doubler (dry pan, dry level, delay pan, delay level)
+    std::array<Knob, 11> knobs; // 0-5 normal mode, 6-9 doubler (dry pan, dry level, delay pan, delay level), 10 human amount
     dfd::ui::ToggleSwitch color { { "A", "B" } }, wetOnly { { "ON", "OFF" } };
     dfd::ui::ToggleSwitch noise { { "XTRA", "AUTH", "OFF" } }, quality { { "4x", "2x", "1x" } };
     dfd::ui::ToggleSwitch meterSelect { { "A", "B" } };
-    dfd::ui::ToggleSwitch modeSwitch { { "DOUBLE", "NORMAL" } };
+    dfd::ui::ToggleSwitch modeSwitch { { "NORMAL", "DOUBLE" }, dfd::ui::ToggleSwitch::Orientation::horizontal };
+    dfd::ui::ToggleSwitch personaSwitch { { "ROBOT", "HUMAN" }, dfd::ui::ToggleSwitch::Orientation::horizontal };
     dfd::ui::RotarySelector routing;
     dfd::ui::PilotLamp lamp;
 
@@ -46,7 +47,7 @@ private:
 
     void timerCallback() override;
     void addKnob (Knob&, const char* paramId, dfd::ui::layout::KnobSpot);
-    void showMode (bool doubler);
+    void showMode (bool doubler, bool human);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DamnFineDelayEditor)
 };

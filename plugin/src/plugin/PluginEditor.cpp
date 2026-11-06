@@ -48,14 +48,18 @@ DamnFineDelayEditor::DamnFineDelayEditor (DamnFineDelayProcessor& p)
     addKnob (knobs[7], ParamIds::dryLevel, layout::dryLevel);
     addKnob (knobs[8], ParamIds::wetPan, layout::wetPan);
     addKnob (knobs[9], ParamIds::wetLevel, layout::wetLevel);
+    addKnob (knobs[10], ParamIds::humanAmount, layout::humanAmount);
 
     color.attach (*apvts.getParameter (ParamIds::color), { 0, 1 });
     wetOnly.attach (*apvts.getParameter (ParamIds::wetOnly), { 1, 0 });
     noise.attach (*apvts.getParameter (ParamIds::noise), { 2, 1, 0 });
     quality.attach (*apvts.getParameter (ParamIds::quality), { 2, 1, 0 });
-    modeSwitch.attach (*apvts.getParameter (ParamIds::doubler), { 1, 0 });
+    modeSwitch.attach (*apvts.getParameter (ParamIds::doubler), { 0, 1 });
+    personaSwitch.attach (*apvts.getParameter (ParamIds::persona), { 0, 1 });
     modeSwitch.setBounds (layout::modeSwitch);
+    personaSwitch.setBounds (layout::personaSwitch);
     face.addAndMakeVisible (modeSwitch);
+    face.addAndMakeVisible (personaSwitch);
     meterSelect.setPosition ((int) apvts.state.getProperty (kMeterChannel, 0), juce::dontSendNotification);
     meterSelect.onChange = [&apvts] (int pos) { apvts.state.setProperty (kMeterChannel, pos, nullptr); };
 
@@ -103,9 +107,10 @@ void DamnFineDelayEditor::addKnob (Knob& k, const char* paramId, layout::KnobSpo
         k.slider.setDoubleClickReturnValue (true, param->convertFrom0to1 (param->getDefaultValue()));
 }
 
-void DamnFineDelayEditor::showMode (bool doubler)
+void DamnFineDelayEditor::showMode (bool doubler, bool human)
 {
-    // Doubler mode mixes with its own pan and level knobs; the normal mix controls and routing do nothing there.
+    // Double mode mixes with its own pan and level knobs; the normal mix controls and routing do nothing there.
+    // The persona section only applies in Double mode, and its amount only to Human.
     auto setActive = [] (juce::Component& c, bool active)
     {
         c.setEnabled (active);
@@ -113,8 +118,10 @@ void DamnFineDelayEditor::showMode (bool doubler)
     };
     for (size_t i : { 0u, 1u, 3u })
         setActive (knobs[i].slider, ! doubler);
-    for (size_t i = 6; i < knobs.size(); ++i)
+    for (size_t i = 6; i <= 9; ++i)
         setActive (knobs[i].slider, doubler);
+    setActive (personaSwitch, doubler);
+    setActive (knobs[10].slider, doubler && human);
     setActive (wetOnly, ! doubler);
     setActive (routing, ! doubler);
 }
@@ -142,10 +149,11 @@ void DamnFineDelayEditor::timerCallback()
 
     auto& apvts = processor.state();
     const bool doubler = apvts.getRawParameterValue (ParamIds::doubler)->load() >= 0.5f;
-    if ((int) doubler != shownMode)
+    const bool human = apvts.getRawParameterValue (ParamIds::persona)->load() >= 0.5f;
+    if (const int mode = (int) doubler * 2 + (int) human; mode != shownMode)
     {
-        shownMode = (int) doubler;
-        showMode (doubler);
+        shownMode = mode;
+        showMode (doubler, human);
     }
     const int route = doubler ? 2 : juce::roundToInt (apvts.getRawParameterValue (ParamIds::routing)->load());
     const auto outs = outputLabels (numOut, route);
@@ -157,7 +165,8 @@ void DamnFineDelayEditor::timerCallback()
     vu.setChannelName (outs[vuChannel]);
 
     diagram.setState ({ route, apvts.getRawParameterValue (ParamIds::temperature)->load(), numIn, numOut, doubler,
-                        apvts.getRawParameterValue (ParamIds::dryPan)->load() / 100.0f, apvts.getRawParameterValue (ParamIds::wetPan)->load() / 100.0f });
+                        apvts.getRawParameterValue (ParamIds::dryPan)->load() / 100.0f, apvts.getRawParameterValue (ParamIds::wetPan)->load() / 100.0f,
+                        doubler && human, apvts.getRawParameterValue (ParamIds::humanAmount)->load() });
 
     const auto blocks = m.processedBlocks.load();
     if (blocks != lastBlocks)

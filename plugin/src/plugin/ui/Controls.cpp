@@ -85,7 +85,7 @@ void RackLook::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h, 
 
 // ------------------------------------------------------------------------------------------- ToggleSwitch
 
-ToggleSwitch::ToggleSwitch (juce::StringArray legendsTopToBottom) : legends (std::move (legendsTopToBottom))
+ToggleSwitch::ToggleSwitch (juce::StringArray legendsInOrder, Orientation o) : legends (std::move (legendsInOrder)), orientation (o)
 {
     jassert (legends.size() == 2 || legends.size() == 3);
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
@@ -116,15 +116,64 @@ void ToggleSwitch::setPosition (int newPosition, juce::NotificationType notifica
         onChange (position);
 }
 
-juce::Point<float> ToggleSwitch::nutCentre() const { return { 15.0f, getHeight() * 0.5f }; }
-float ToggleSwitch::throwLength() const { return getHeight() * 0.5f - 9.0f; }
+juce::Point<float> ToggleSwitch::nutCentre() const
+{
+    return orientation == Orientation::vertical ? juce::Point<float> { 15.0f, getHeight() * 0.5f } : getLocalBounds().toFloat().getCentre();
+}
+
+float ToggleSwitch::throwLength() const { return orientation == Orientation::vertical ? getHeight() * 0.5f - 9.0f : 15.0f; }
 
 void ToggleSwitch::mouseDown (const juce::MouseEvent& e)
 {
     if (legends.size() == 2)
         setPosition (1 - position, juce::sendNotification);
     else
-        setPosition (position + (e.position.y < nutCentre().y ? -1 : 1), juce::sendNotification);
+    {
+        const bool before = orientation == Orientation::vertical ? e.position.y < nutCentre().y : e.position.x < nutCentre().x;
+        setPosition (position + (before ? -1 : 1), juce::sendNotification);
+    }
+}
+
+void ToggleSwitch::paintLegends (juce::Graphics& g, juce::Point<float> c, float len) const
+{
+    const int n = legends.size();
+    for (int i = 0; i < n; ++i)
+    {
+        const auto colour = i == position ? colours::silk : colours::silkDim;
+        if (orientation == Orientation::vertical)
+        {
+            const float ly = n == 2 ? (i == 0 ? c.y - len : c.y + len) : c.y + (float) (i - 1) * len;
+            silkText (g, legends[i], { 28.0f, ly - 7.0f, (float) getWidth() - 28.0f, 14.0f }, 10.0f, juce::Justification::centredLeft, colour);
+        }
+        else if (i == 0) // clear of the lever tip when it points this way
+            silkText (g, legends[i], { 0.0f, c.y - 7.0f, c.x - len - 4.0f, 14.0f }, 9.0f, juce::Justification::centredRight, colour);
+        else if (i == n - 1)
+            silkText (g, legends[i], { c.x + len + 4.0f, c.y - 7.0f, (float) getWidth() - c.x - len - 4.0f, 14.0f }, 9.0f, juce::Justification::centredLeft, colour);
+        else
+            silkText (g, legends[i], { c.x - 30.0f, 0.0f, 60.0f, c.y - 10.0f }, 9.5f, juce::Justification::centredBottom, colour);
+    }
+}
+
+void ToggleSwitch::paintLever (juce::Graphics& g, juce::Point<float> c, juce::Point<float> dir, float len) const
+{
+    const juce::Point<float> across { -dir.y, dir.x };
+    const auto tip = c + dir * (len - 3.0f);
+    juce::Path lever;
+    lever.startNewSubPath (c - across * 2.8f);
+    lever.lineTo (tip - across * 1.9f);
+    lever.lineTo (tip + across * 1.9f);
+    lever.lineTo (c + across * 2.8f);
+    lever.closeSubPath();
+    g.setColour (juce::Colours::black.withAlpha (0.45f));
+    g.fillPath (lever, juce::AffineTransform::translation (2.0f, 2.0f));
+    const auto a = c - across * 3.0f, b = c + across * 3.0f;
+    juce::ColourGradient shine (colours::chromeDark, a.x, a.y, colours::chromeDark, b.x, b.y, false);
+    shine.addColour (0.4, colours::chrome);
+    g.setGradientFill (shine);
+    g.fillPath (lever);
+    fillChromeDisc (g, tip, 3.6f);
+    g.setColour (juce::Colours::white.withAlpha (0.7f));
+    g.fillEllipse (tip.x - 1.8f, tip.y - 2.2f, 1.6f, 1.6f);
 }
 
 void ToggleSwitch::paint (juce::Graphics& g)
@@ -132,13 +181,7 @@ void ToggleSwitch::paint (juce::Graphics& g)
     const auto c = nutCentre();
     const float len = throwLength();
     const int n = legends.size();
-
-    for (int i = 0; i < n; ++i)
-    {
-        const float ly = n == 2 ? (i == 0 ? c.y - len : c.y + len) : c.y + (float) (i - 1) * len;
-        silkText (g, legends[i], { 28.0f, ly - 7.0f, (float) getWidth() - 28.0f, 14.0f }, 10.0f, juce::Justification::centredLeft,
-                  i == position ? colours::silk : colours::silkDim);
-    }
+    paintLegends (g, c, len);
 
     // Hex nut and bushing.
     juce::Path hex;
@@ -156,33 +199,15 @@ void ToggleSwitch::paint (juce::Graphics& g)
     g.setColour (juce::Colours::black.withAlpha (0.35f));
     g.drawEllipse (c.x - 5.5f, c.y - 5.5f, 11.0f, 11.0f, 0.8f);
 
-    const bool centred = n == 3 && position == 1;
-    if (centred)
+    if (n == 3 && position == 1)
     {
         fillChromeDisc (g, c, 4.2f);
         g.setColour (juce::Colours::white.withAlpha (0.8f));
         g.fillEllipse (c.x - 2.0f, c.y - 2.5f, 2.0f, 2.0f);
         return;
     }
-
-    const bool up = position == 0;
-    const float dir = up ? -1.0f : 1.0f;
-    const juce::Point<float> tip { c.x, c.y + dir * (len - 3.0f) };
-    juce::Path lever;
-    lever.startNewSubPath (c.x - 2.8f, c.y);
-    lever.lineTo (tip.x - 1.9f, tip.y);
-    lever.lineTo (tip.x + 1.9f, tip.y);
-    lever.lineTo (c.x + 2.8f, c.y);
-    lever.closeSubPath();
-    g.setColour (juce::Colours::black.withAlpha (0.45f));
-    g.fillPath (lever, juce::AffineTransform::translation (2.0f, 2.0f));
-    juce::ColourGradient shine (colours::chromeDark, c.x - 3.0f, 0.0f, colours::chromeDark, c.x + 3.0f, 0.0f, false);
-    shine.addColour (0.4, colours::chrome);
-    g.setGradientFill (shine);
-    g.fillPath (lever);
-    fillChromeDisc (g, tip, 3.6f);
-    g.setColour (juce::Colours::white.withAlpha (0.7f));
-    g.fillEllipse (tip.x - 1.8f, tip.y - 2.2f, 1.6f, 1.6f);
+    const float sign = position == 0 ? -1.0f : 1.0f;
+    paintLever (g, c, orientation == Orientation::vertical ? juce::Point<float> { 0.0f, sign } : juce::Point<float> { sign, 0.0f }, len);
 }
 
 // ------------------------------------------------------------------------------------------- RotarySelector

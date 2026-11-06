@@ -29,6 +29,8 @@ public:
         int numIn = 2, numOut = 2;
         bool doubler = false;
         float dryPan = -0.6f, wetPan = 0.6f; // -1 left .. +1 right
+        bool human = false;
+        float humanMs = 3.0f;
         bool operator== (const State&) const = default;
     };
 

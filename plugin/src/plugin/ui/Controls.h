@@ -15,11 +15,13 @@ public:
     juce::Label* createSliderTextBox (juce::Slider&) override;
 };
 
-/** Bat-handle toggle with 2 or 3 positions; legends listed top to bottom. */
+/** Bat-handle toggle with 2 or 3 positions. Legends are listed top to bottom (vertical) or left to right (horizontal). */
 class ToggleSwitch final : public juce::Component
 {
 public:
-    explicit ToggleSwitch (juce::StringArray legendsTopToBottom);
+    enum class Orientation { vertical, horizontal };
+
+    explicit ToggleSwitch (juce::StringArray legends, Orientation = Orientation::vertical);
 
     int getPosition() const noexcept { return position; }
     void setPosition (int newPosition, juce::NotificationType);
@@ -33,12 +35,15 @@ public:
 
 private:
     juce::StringArray legends;
+    Orientation orientation;
     int position = 0;
     std::vector<int> paramIndex;
     std::unique_ptr<juce::ParameterAttachment> attachment;
 
     juce::Point<float> nutCentre() const;
     float throwLength() const;
+    void paintLegends (juce::Graphics&, juce::Point<float> nut, float len) const;
+    void paintLever (juce::Graphics&, juce::Point<float> nut, juce::Point<float> direction, float len) const;
 };
 
 /** Pointer knob that snaps between labelled positions spread over the top arc. */

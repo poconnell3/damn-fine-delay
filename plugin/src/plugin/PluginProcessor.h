@@ -22,6 +22,8 @@ inline constexpr auto dryPan = "dryPan";
 inline constexpr auto dryLevel = "dryLevel";
 inline constexpr auto wetPan = "wetPan";
 inline constexpr auto wetLevel = "wetLevel";
+inline constexpr auto persona = "persona";
+inline constexpr auto humanAmount = "humanAmount";
 } // namespace ParamIds
 
 class DamnFineDelayProcessor final : public juce::AudioProcessor,
@@ -113,6 +115,8 @@ private:
         std::atomic<float>* dryLevel;
         std::atomic<float>* wetPan;
         std::atomic<float>* wetLevel;
+        std::atomic<float>* persona;
+        std::atomic<float>* humanAmount;
     } raw {};
 
     dfd::EngineSetup currentSetup() const;

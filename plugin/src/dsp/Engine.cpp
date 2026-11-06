@@ -61,6 +61,11 @@ void Engine::prepare (double sampleRate, const EngineSetup& setup, const EngineP
     wetPan.snap (initial.wetPan);
     dryLevel.snap (dbToGain (initial.dryLevelDb));
     wetLevel.snap (dbToGain (initial.wetLevelDb));
+    humanAmount.coeff = 1.0 - std::exp (-1.0 / (0.3 * fs)); // slow, so turning the knob doesn't bend pitch
+    humanAmount.snap (initial.doubler && initial.human ? initial.humanMs * 1e-3 : 0.0);
+    drift = {};
+    drift.rng = 0x2545F4914F6CDD1Dull ^ (setup.seed * 0x9E3779B97F4A7C15ull);
+    driftSeconds = 0.0;
     reset();
 }
 
@@ -85,8 +90,45 @@ void Engine::reset()
 
 void Engine::applyRoutingDelays (bool immediate) noexcept
 {
-    lineA.setExtraDelay (extraSeconds, immediate);
-    lineB.setExtraDelay (params.routing == Routing::Cascade ? 0.0 : extraSeconds, immediate);
+    // In Cascade the drift is split across both lines, so neither line's delay gets close to zero.
+    const bool cascade = params.routing == Routing::Cascade;
+    const double half = cascade ? 0.5 * driftSeconds : 0.0;
+    lineA.setExtraDelay (extraSeconds + half, immediate);
+    lineB.setExtraDelay (cascade ? half : extraSeconds, immediate);
+}
+
+double Engine::Drift::uniform() noexcept
+{
+    rng ^= rng << 13;
+    rng ^= rng >> 7;
+    rng ^= rng << 17;
+    return (double) (rng >> 11) * (1.0 / 9007199254740992.0);
+}
+
+void Engine::advanceDrift() noexcept
+{
+    const double amount = humanAmount.next();
+    if (amount < 1e-9 && std::abs (driftSeconds) < 1e-9)
+    {
+        if (driftSeconds != 0.0)
+        {
+            driftSeconds = 0.0;
+            applyRoutingDelays (false);
+        }
+        return;
+    }
+    // New target every 0.6-1.6 s; the glide (omega 2.5 rad/s) keeps the pitch bend within about 0.2 % per ms of amount.
+    if (--drift.countdown <= 0)
+    {
+        drift.target = 2.0 * drift.uniform() - 1.0;
+        drift.countdown = (int) ((0.6 + drift.uniform()) * fs);
+    }
+    constexpr double omega = 2.5;
+    const double dt = 1.0 / fs;
+    drift.velocity += dt * (omega * omega * (drift.target - drift.value) - 2.0 * omega * drift.velocity);
+    drift.value = std::clamp (drift.value + dt * drift.velocity, -1.0, 1.0);
+    driftSeconds = amount * drift.value;
+    applyRoutingDelays (false);
 }
 
 void Engine::setParams (const EngineParams& p) noexcept
@@ -109,12 +151,14 @@ void Engine::setParams (const EngineParams& p) noexcept
     wetPan.set (p.wetPan);
     dryLevel.set (dbToGain (p.dryLevelDb));
     wetLevel.set (dbToGain (p.wetLevelDb));
+    humanAmount.set (p.doubler && p.human ? std::clamp (p.humanMs, 0.0, 10.0) * 1e-3 : 0.0);
 }
 
 void Engine::processSample (double inL, double inR, double& outL, double& outR) noexcept
 {
     const LineSwitches sw { params.nonlinear, params.noise };
     const double g = drive.next();
+    advanceDrift();
 
     double inA = inL, inB = inR;
     if (params.routing != Routing::Dual)

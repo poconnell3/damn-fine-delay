@@ -76,8 +76,9 @@ namespace layout
     inline constexpr KnobSpot levelA { 552 + kX, 102, 66, "LEVEL A" }, levelB { 552 + kX, 230, 66, "LEVEL B" };
     inline constexpr KnobSpot drive { 878 + kX, 102, 50, "DRIVE" }, mix { 946 + kX, 102, 50, "MIX" };
     inline constexpr KnobSpot output { 878 + kX, 230, 50, "OUTPUT" }, temperature { 946 + kX, 230, 50, "ROOM" };
-    inline constexpr KnobSpot dryPan { 152, 182, 44, "PAN" }, dryLevel { 152, 265, 44, "LEVEL" };
-    inline constexpr KnobSpot wetPan { 222, 182, 44, "PAN" }, wetLevel { 222, 265, 44, "LEVEL" };
+    inline constexpr KnobSpot dryPan { 152, 201, 38, "PAN" }, dryLevel { 152, 279, 38, "LEVEL" };
+    inline constexpr KnobSpot wetPan { 222, 201, 38, "PAN" }, wetLevel { 222, 279, 38, "LEVEL" };
+    inline constexpr KnobSpot humanAmount { 241, 104, 30, "AMOUNT" };
 
     inline juce::Rectangle<int> knobBounds (KnobSpot k)
     {
@@ -91,7 +92,13 @@ namespace layout
     inline juce::Rectangle<float> titleAbove (juce::Rectangle<int> r) { return r.translated (0, -18).withHeight (14).toFloat().expanded (6.0f, 0.0f); }
     inline juce::Rectangle<float> toggleTitle (int col, int row) { return titleAbove (toggle (col, row)); }
 
-    inline const juce::Rectangle<int> modeSwitch { 150, 44, 84, 66 };
-    inline const juce::Rectangle<float> dryHeader { 117.0f, 122.0f, 70.0f, 13.0f }, wetHeader { 187.0f, 122.0f, 70.0f, 13.0f };
+    // Doubler plate, top to bottom: MODE switch, PERSONA switch with its AMOUNT knob, then the DRY and 30 MS columns.
+    inline const juce::Rectangle<int> modeSwitch { 114, 34, 146, 28 };
+    inline const juce::Rectangle<float> modeTitle { 120.0f, 17.0f, 80.0f, 14.0f };
+    inline constexpr int modeDivider = 68;
+    inline const juce::Rectangle<int> personaSwitch { 112, 90, 108, 28 };
+    inline const juce::Rectangle<float> personaTitle { 120.0f, 69.0f, 80.0f, 14.0f };
+    inline constexpr int personaDivider = 143;
+    inline const juce::Rectangle<float> dryHeader { 117.0f, 148.0f, 70.0f, 13.0f }, wetHeader { 187.0f, 148.0f, 70.0f, 13.0f };
 } // namespace layout
 } // namespace dfd::ui

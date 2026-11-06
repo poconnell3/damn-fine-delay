@@ -1,4 +1,4 @@
-# Damn Fine Delay (v0.3)
+# Damn Fine Delay (v0.4)
 
 A real-time plug-in model of the 1971 two-line acoustic tube delay (16 ms and 14 ms lines, 30 ms cascade). The DSP core is plain C++20 with no JUCE dependency; JUCE wraps it as VST3, AU (macOS), CLAP and Standalone.
 
@@ -7,7 +7,7 @@ A real-time plug-in model of the 1971 two-line acoustic tube delay (16 ms and 14
 ```
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release        # downloads JUCE 8.0.9 and clap-juce-extensions
 cmake --build build                                            # builds and installs the plug-ins
-ctest --test-dir build                                         # C++ spec tests (103 checks)
+ctest --test-dir build                                         # C++ spec tests (108 checks)
 ```
 
 Each build copies the plug-ins into your user plug-in folders: on macOS `~/Library/Audio/Plug-Ins/` (`VST3`, `Components`, `CLAP`), on Linux `~/.vst3` and `~/.clap`, on Windows the VST3 goes to the Common Files `VST3` folder (needs an administrator prompt; copy the CLAP by hand). On macOS the build also restarts the Audio Unit registrar so Logic sees a rebuilt AU. Turn this off with `-DDFD_COPY_AFTER_BUILD=OFF`.
@@ -50,6 +50,8 @@ Routing (Widener, Dual mono, Cascade), Color (A original / B leveled), Drive, Mi
 
 Double mode (switch at the left end): the classic guitar-doubling setup, with the dry signal on one side and the 30 ms cascade (A into B) on the other. The dry signal and the cascade become two mono sources, each with its own Pan and Level knob (defaults: dry at 9 o'clock, L60; delay at 3 o'clock, R60). Panning is constant power: centre is -3 dB per side, and a hard pan puts that source on one side only. In this mode Routing, Mix, Wet Only and Level A/B have no effect and are greyed out; Drive, Color, Noise, Output and Room still apply. On a mono output the pans are ignored and both sources are summed.
 
+Persona (Double mode only): Robot (default) keeps the 30 ms copy exactly in time. Human makes the copy drift slowly and randomly earlier and later, like a second take played by hand; the Amount knob sets the largest shift (0 to +-10 ms, default +-3 ms). New random targets come every 0.6 to 1.6 s and the copy glides to them, so there are no jumps. Gliding changes pitch slightly while it moves (under 1 % at +-3 ms), which is part of what makes a double sound played rather than copied. The drift is split across both lines, so it adds no latency.
+
 Bypass keeps the reported latency, so switching it in and out doesn't shift the audio.
 
 ## Editor
@@ -57,7 +59,7 @@ Bypass keeps the reported latency, so switching it in and out doesn't shift the 
 A rack panel drawn at 1384 x 330 and scaled as a whole (drag the corner; the size is saved with the session).
 
 - Left end: input meters. Right end: output meters. Peak meters on an IEC scale with peak hold and clip lamps (click a meter to reset). One meter for a mono bus, two for stereo. Labels follow the routing: inputs read L/R, or A/B in Dual mono (left feeds A, right feeds B); outputs read A/B, or L/R in Cascade.
-- Doubler plate (left end): MODE switch (Normal / Double), then Pan over Level for the dry signal and for the 30 ms cascade. Active only in Double mode.
+- Doubler plate (left end): MODE switch (Normal left, Double right); PERSONA switch (Robot left, Human right) with its AMOUNT knob; then Pan over Level for the dry signal and for the 30 ms cascade. Everything below MODE is active only in Double mode, and AMOUNT only with Human.
 - Diagram plate: the signal flow for the current routing or for Double mode, with the delay times at the current room temperature.
 - VU meter: 0 VU = -18 dBFS, standard VU ballistics, reading output A or B (METER switch).
 - ACTIVE lamp: lit while the host is sending audio through the plug-in. If it stays dark the host isn't processing the track (for example a record-armed track in Logic with input monitoring off).

@@ -1,4 +1,5 @@
 // Spec tests for the real-time engine (doc 03 section 7). Run: ./dfd_tests
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <functional>
@@ -419,6 +420,54 @@ void testDoubler()
            fmt ("mono output: dry %.3f, cascade peak %.3f", y[0], peak (y, tap - 40, tap + 40)));
 }
 
+/** Arrival time (ms, relative to 30 ms) of the cascade copy of clicks every 0.4 s, delay hard right. */
+std::vector<double> doublerArrivals (bool human, double humanMs, double seconds)
+{
+    EngineParams p = linearParams (Color::B, Routing::Cascade);
+    p.doubler = true;
+    p.dryPan = -1.0;
+    p.wetPan = 1.0;
+    p.human = human;
+    p.humanMs = humanMs;
+    const double fs = 48000.0;
+    const int period = (int) (0.4 * fs);
+    Run r = run (fs, EngineSetup {}, p, [&] (int i) { return i % period == 0 ? 1.0 : 0.0; }, [] (int) { return 0.0; }, seconds);
+    std::vector<double> ms;
+    const double nominal = (Engine::kTauA + Engine::kTauB) * fs + r.latency;
+    for (int k = 1; (k + 1) * period < (int) r.right.size(); ++k)
+    {
+        // Parabolic peak over a +-15 ms window around the nominal arrival.
+        const int lo = k * period + (int) nominal - 720, hi = k * period + (int) nominal + 720;
+        int best = lo;
+        for (int i = lo; i < hi; ++i)
+            if (std::abs (r.right[(size_t) i]) > std::abs (r.right[(size_t) best]))
+                best = i;
+        const double a = r.right[(size_t) best - 1], b = r.right[(size_t) best], c = r.right[(size_t) best + 1];
+        const double frac = 0.5 * (a - c) / (a - 2.0 * b + c);
+        ms.push_back ((best + frac - k * period - nominal) / fs * 1000.0);
+    }
+    return ms;
+}
+
+void testHumanPersona()
+{
+    std::puts ("human persona (random drift both ways within +-amount; robot is exact)");
+    auto range = [] (const std::vector<double>& v)
+    {
+        const auto [lo, hi] = std::minmax_element (v.begin(), v.end());
+        return std::pair { *lo, *hi };
+    };
+    const auto robot = range (doublerArrivals (false, 5.0, 8.0));
+    check (std::abs (robot.first) < 0.05 && std::abs (robot.second) < 0.05,
+           fmt ("robot: arrivals %.3f..%.3f ms from 30 ms", robot.first, robot.second));
+    for (double amount : { 2.0, 5.0 })
+    {
+        const auto h = range (doublerArrivals (true, amount, 24.0));
+        check (h.first > -amount - 0.3 && h.second < amount + 0.3, fmt ("human +-%.0f ms: arrivals %.2f..%.2f ms", amount, h.first, h.second));
+        check (h.first < -0.25 * amount && h.second > 0.25 * amount, fmt ("human +-%.0f ms: drifts both earlier (%.2f) and later (%.2f)", amount, h.first, h.second));
+    }
+}
+
 void testStress()
 {
     std::puts ("automation stress (no NaN/Inf, bounded output, smooth color/routing switches)");
@@ -441,6 +490,8 @@ void testStress()
         p.doubler = (block / 71) % 2 == 1;
         p.dryPan = std::sin (block * 0.013);
         p.wetPan = -p.dryPan;
+        p.human = (block / 43) % 2 == 1;
+        p.humanMs = 10.0 * std::abs (std::sin (block * 0.007));
         e.setParams (p);
         for (int i = 0; i < 64; ++i)
         {
@@ -468,6 +519,7 @@ int main (int argc, char** argv)
     testNoiseAndCrosstalk();
     testBypass();
     testDoubler();
+    testHumanPersona();
     testStress();
     std::printf ("%d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

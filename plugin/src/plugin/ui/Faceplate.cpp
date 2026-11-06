@@ -130,16 +130,17 @@ void Faceplate::paintStatic (juce::Graphics& g)
     thumbScrew (g, { lp.getX() + 13.0f, lp.getCentreY() });
     thumbScrew (g, { lp.getRight() - 13.0f, lp.getCentreY() });
 
-    // Doubler plate: mode switch, then pan over level for the dry signal and the 30 ms cascade.
+    // Doubler plate: mode switch, persona switch and amount, then pan over level for the dry signal and the 30 ms cascade.
     const auto dp = doublerPlate.toFloat();
-    for (auto c : { juce::Point<float> (dp.getCentreX(), dp.getY() + 9.0f), juce::Point<float> (dp.getCentreX(), dp.getBottom() - 9.0f) })
-        drawScrew (g, c, 3.5f);
-    silkText (g, "MODE", titleAbove (modeSwitch), 10.0f, juce::Justification::centredLeft);
+    silkText (g, "MODE", modeTitle, 10.0f, juce::Justification::centredLeft);
+    silkText (g, "PERSONA", personaTitle, 10.0f, juce::Justification::centredLeft);
+    silkText (g, humanAmount.label, knobLabel (humanAmount), 9.5f, juce::Justification::centred, colours::silkDim);
     silkText (g, "DRY", dryHeader, 12.0f, juce::Justification::centred, colours::amberDim);
     silkText (g, "30 MS", wetHeader, 12.0f, juce::Justification::centred, colours::amberDim);
     g.setColour (colours::silkDim);
-    g.drawHorizontalLine ((int) dryHeader.getY() - 7, dp.getX() + 12.0f, dp.getRight() - 12.0f);
-    g.drawVerticalLine ((int) dp.getCentreX(), dryHeader.getY(), dp.getBottom() - 22.0f);
+    for (int y : { modeDivider, personaDivider })
+        g.drawHorizontalLine (y, dp.getX() + 10.0f, dp.getRight() - 10.0f);
+    g.drawVerticalLine ((int) dp.getCentreX(), dryHeader.getY(), dp.getBottom() - 4.0f);
     for (auto k : { dryPan, dryLevel, wetPan, wetLevel })
         silkText (g, k.label, knobLabel (k), 9.5f, juce::Justification::centred, colours::silkDim);
 
@@ -286,8 +287,11 @@ void SignalDiagram::paintDoubler (juce::Graphics& g, double msA, double msB)
     }
 
     const auto dashedBox = juce::Rectangle<float> (kTube - 8.0f, kRowA - 28.0f, kTubeEnd - kTube + 16.0f, kRowB - kRowA + 50.0f);
-    silkText (g, "DOUBLER  DRY AND " + juce::String (msA + msB, 1) + " ms", dashedBox.withY (dashedBox.getBottom() + 5.0f).withHeight (12.0f).expanded (30.0f, 0.0f),
-              8.5f, juce::Justification::centred, colours::silkDim, false);
+    const auto caption = dashedBox.withY (dashedBox.getBottom() + 5.0f).withHeight (12.0f).expanded (40.0f, 0.0f);
+    silkText (g, "DOUBLER  DRY AND " + juce::String (msA + msB, 1) + " ms", caption, 8.5f, juce::Justification::centred, colours::silkDim, false);
+    if (state.human)
+        silkText (g, "HUMAN TIMING  " + juce::String (juce::CharPointer_UTF8 ("\xc2\xb1")) + juce::String (state.humanMs, 1) + " ms",
+                  caption.translated (0.0f, 13.0f), 8.5f, juce::Justification::centred, colours::amberDim);
 }
 
 void SignalDiagram::paint (juce::Graphics& g)
