@@ -343,6 +343,34 @@ void testDryAlignmentAndRoutings()
            fmt ("widener: left peak %.0f (768), right peak %.0f (672)", peakIndex (w.left), peakIndex (w.right)));
 }
 
+void testBypass()
+{
+    std::puts ("bypass keeps the reported latency and switches seamlessly");
+    for (int os : { 1, 2, 4 })
+    {
+        EngineSetup s;
+        s.oversampling = os;
+        EngineParams p = linearParams();
+        p.mix = 0.0;
+        Engine e;
+        e.prepare (48000.0, s, p);
+        const int lat = e.latencySamples();
+        std::vector<float> l (4096), r (4096), inL (4096), inR (4096);
+        for (size_t i = 0; i < l.size(); ++i)
+        {
+            inL[i] = l[i] = (float) std::sin (0.01 * (double) i);
+            inR[i] = r[i] = (float) std::cos (0.013 * (double) i);
+        }
+        // Alternate processed (dry only) and bypassed blocks: the output must be one continuous delayed copy.
+        for (int start = 0, k = 0; start < 4096; start += 256, ++k)
+            std::invoke (k % 2 ? &Engine::processBypassed : &Engine::process, e, l.data() + start, r.data() + start, 256);
+        double err = 0.0;
+        for (size_t i = (size_t) lat; i < l.size(); ++i)
+            err = std::max ({ err, std::abs ((double) l[i] - inL[i - (size_t) lat]), std::abs ((double) r[i] - inR[i - (size_t) lat]) });
+        check (err < 1e-6, fmt ("os %.0f: bypass output = input delayed by %.0f samples (max error %.1e)", os, lat, err));
+    }
+}
+
 void testStress()
 {
     std::puts ("automation stress (no NaN/Inf, bounded output, smooth color/routing switches)");
@@ -387,6 +415,7 @@ int main (int argc, char** argv)
     testEcho();
     testDistortion();
     testNoiseAndCrosstalk();
+    testBypass();
     testStress();
     std::printf ("%d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

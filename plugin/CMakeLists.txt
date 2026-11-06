@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(DamnFineDelay VERSION 0.1.0 LANGUAGES C CXX)
+project(DamnFineDelay VERSION 0.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,6 +8,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(DFD_BUILD_PLUGIN "Build the JUCE plug-in (VST3/AU/Standalone)" ON)
 option(DFD_BUILD_CLAP "Also build a CLAP target via clap-juce-extensions" ON)
+option(DFD_COPY_AFTER_BUILD "Install the plug-ins into your user plug-in folders after each build" ON)
+option(DFD_BUILD_UI_SNAPSHOT "Build dfd_ui_snapshot, which renders the editor to a PNG (development tool)" OFF)
 set(DFD_JUCE_PATH "" CACHE PATH "Local JUCE checkout; downloaded when empty")
 
 # ---------------------------------------------------------------- DSP core (no JUCE)
@@ -55,10 +57,16 @@ if(DFD_BUILD_PLUGIN)
         NEEDS_MIDI_OUTPUT FALSE
         IS_MIDI_EFFECT FALSE
         EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-        COPY_PLUGIN_AFTER_BUILD TRUE
+        COPY_PLUGIN_AFTER_BUILD ${DFD_COPY_AFTER_BUILD}
         VST3_CATEGORIES Fx Delay)
 
-    target_sources(DamnFineDelay PRIVATE src/plugin/PluginProcessor.cpp src/plugin/PluginEditor.cpp)
+    set(DFD_PLUGIN_SOURCES
+        src/plugin/PluginProcessor.cpp
+        src/plugin/PluginEditor.cpp
+        src/plugin/ui/Controls.cpp
+        src/plugin/ui/Faceplate.cpp
+        src/plugin/ui/Meters.cpp)
+    target_sources(DamnFineDelay PRIVATE ${DFD_PLUGIN_SOURCES})
     target_compile_definitions(DamnFineDelay PUBLIC
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
@@ -67,6 +75,24 @@ if(DFD_BUILD_PLUGIN)
     target_link_libraries(DamnFineDelay
         PRIVATE dfd_dsp juce::juce_audio_utils juce::juce_dsp
         PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags)
+
+    # Logic caches Audio Unit scans; restarting the registrar makes it see a rebuilt AU without a reboot.
+    if(APPLE AND DFD_COPY_AFTER_BUILD)
+        add_custom_command(TARGET DamnFineDelay_AU POST_BUILD
+            COMMAND sh -c "killall -9 AudioComponentRegistrar 2>/dev/null || true"
+            VERBATIM)
+    endif()
+
+    if(DFD_BUILD_UI_SNAPSHOT)
+        juce_add_console_app(dfd_ui_snapshot PRODUCT_NAME "dfd_ui_snapshot")
+        target_sources(dfd_ui_snapshot PRIVATE tools/ui_snapshot.cpp ${DFD_PLUGIN_SOURCES})
+        target_compile_definitions(dfd_ui_snapshot PRIVATE
+            JucePlugin_Name="Damn Fine Delay"
+            JUCE_WEB_BROWSER=0
+            JUCE_USE_CURL=0
+            JUCE_MODAL_LOOPS_PERMITTED=1)
+        target_link_libraries(dfd_ui_snapshot PRIVATE dfd_dsp juce::juce_audio_utils juce::juce_recommended_config_flags)
+    endif()
 
     if(DFD_BUILD_CLAP)
         FetchContent_Declare(clap-juce-extensions

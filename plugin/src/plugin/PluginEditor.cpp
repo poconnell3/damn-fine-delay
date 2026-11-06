@@ -2,157 +2,137 @@
 
 namespace
 {
-const juce::Colour kPanel { 0xff2b2f33 };
-const juce::Colour kPanelEdge { 0xff3c4247 };
-const juce::Colour kInk { 0xffe8e4da };
-const juce::Colour kInkDim { 0xff9aa0a6 };
-const juce::Colour kAccent { 0xfff0a42a };
-const juce::Colour kKnob { 0xff15181a };
+namespace layout = dfd::ui::layout;
+
+const juce::Identifier kUiScale { "uiScale" }, kMeterChannel { "meterChannel" };
+constexpr float kMinScale = 0.6f, kMaxScale = 1.6f;
+
+juce::StringArray inputLabels (int numIn, int routing)
+{
+    if (numIn < 2)
+        return { "IN" };
+    return routing == 1 ? juce::StringArray { "A", "B" } : juce::StringArray { "L", "R" };
+}
+
+juce::StringArray outputLabels (int numOut, int routing)
+{
+    if (numOut < 2)
+        return { "OUT" };
+    return routing == 2 ? juce::StringArray { "L", "R" } : juce::StringArray { "A", "B" };
+}
 } // namespace
 
-DamnFineDelayEditor::PanelLook::PanelLook()
-{
-    setColour (juce::Slider::textBoxTextColourId, kInk);
-    setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
-    setColour (juce::ComboBox::backgroundColourId, kKnob);
-    setColour (juce::ComboBox::textColourId, kInk);
-    setColour (juce::ComboBox::outlineColourId, kPanelEdge);
-    setColour (juce::ComboBox::arrowColourId, kAccent);
-    setColour (juce::PopupMenu::backgroundColourId, kKnob);
-    setColour (juce::PopupMenu::textColourId, kInk);
-    setColour (juce::PopupMenu::highlightedBackgroundColourId, kAccent);
-    setColour (juce::PopupMenu::highlightedTextColourId, kKnob);
-    setColour (juce::Label::textColourId, kInkDim);
-}
-
-void DamnFineDelayEditor::PanelLook::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h, float pos,
-                                                       float start, float end, juce::Slider&)
-{
-    const auto bounds = juce::Rectangle<int> (x, y, w, h).toFloat().reduced (6.0f);
-    const float radius = juce::jmin (bounds.getWidth(), bounds.getHeight()) / 2.0f;
-    const auto centre = bounds.getCentre();
-    const float angle = start + pos * (end - start);
-
-    juce::Path track;
-    track.addCentredArc (centre.x, centre.y, radius, radius, 0.0f, start, end, true);
-    g.setColour (kPanelEdge);
-    g.strokePath (track, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-
-    juce::Path value;
-    value.addCentredArc (centre.x, centre.y, radius, radius, 0.0f, start, angle, true);
-    g.setColour (kAccent);
-    g.strokePath (value, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-
-    const float knobR = radius - 7.0f;
-    g.setColour (kKnob);
-    g.fillEllipse (centre.x - knobR, centre.y - knobR, 2.0f * knobR, 2.0f * knobR);
-    const juce::Point<float> tip = centre.getPointOnCircumference (knobR - 4.0f, angle);
-    g.setColour (kInk);
-    g.drawLine ({ centre.getPointOnCircumference (knobR * 0.35f, angle), tip }, 2.0f);
-}
-
 DamnFineDelayEditor::DamnFineDelayEditor (DamnFineDelayProcessor& p)
-    : AudioProcessorEditor (&p), processor (p)
+    : AudioProcessorEditor (&p),
+      processor (p),
+      routing (*p.state().getParameter (ParamIds::routing), { "WIDE", "DUAL", "CASCADE" })
 {
-    setLookAndFeel (&look);
-    setUpKnob (knobs[0], ParamIds::drive, "DRIVE");
-    setUpKnob (knobs[1], ParamIds::mix, "MIX");
-    setUpKnob (knobs[2], ParamIds::output, "OUTPUT");
-    setUpKnob (knobs[3], ParamIds::levelA, "LEVEL A  16 ms");
-    setUpKnob (knobs[4], ParamIds::levelB, "LEVEL B  14 ms");
-    setUpKnob (knobs[5], ParamIds::temperature, "ROOM TEMP");
-    setUpChoice (choices[0], ParamIds::routing, "ROUTING");
-    setUpChoice (choices[1], ParamIds::color, "COLOR");
-    setUpChoice (choices[2], ParamIds::noise, "NOISE");
-    setUpChoice (choices[3], ParamIds::quality, "QUALITY");
-    status.setFont (juce::FontOptions (12.0f));
-    status.setColour (juce::Label::textColourId, kInkDim);
-    addAndMakeVisible (status);
-    timerCallback();
-    startTimerHz (10);
-    setResizable (false, false);
-    setSize (720, 360);
-}
+    auto& apvts = p.state();
+    addAndMakeVisible (face);
 
-void DamnFineDelayEditor::timerCallback()
-{
-    const auto& d = processor.diagnostics();
-    const auto blocks = d.blocks.load(), bypassed = d.bypassedBlocks.load();
-    juce::String text;
-    text << juce::String (d.sampleRate.load() / 1000.0, 1) << " kHz   " << d.numIn.load() << " in / " << d.numOut.load() << " out   "
-         << "blocks " << juce::String ((juce::int64) blocks) << " (bypassed " << juce::String ((juce::int64) bypassed) << ")   "
-         << "in " << juce::String (d.inDb.load(), 1) << " dB   out " << juce::String (d.outDb.load(), 1) << " dB   "
-         << "latency " << processor.getLatencySamples() << (processor.isSuspended() ? "   SUSPENDED" : "");
-    status.setText (text, juce::dontSendNotification);
+    diagram.setBounds (layout::diagram);
+    inMeters.setBounds (layout::meterArea (layout::inBay));
+    outMeters.setBounds (layout::meterArea (layout::outBay));
+    vu.setBounds (layout::vu);
+    routing.setBounds (layout::routing);
+    for (auto* c : std::initializer_list<juce::Component*> { &diagram, &inMeters, &outMeters, &vu, &routing })
+        face.addAndMakeVisible (c);
+
+    addKnob (knobs[0], ParamIds::levelA, layout::levelA);
+    addKnob (knobs[1], ParamIds::levelB, layout::levelB);
+    addKnob (knobs[2], ParamIds::drive, layout::drive);
+    addKnob (knobs[3], ParamIds::mix, layout::mix);
+    addKnob (knobs[4], ParamIds::output, layout::output);
+    addKnob (knobs[5], ParamIds::temperature, layout::temperature);
+
+    color.attach (*apvts.getParameter (ParamIds::color), { 0, 1 });
+    wetOnly.attach (*apvts.getParameter (ParamIds::wetOnly), { 1, 0 });
+    noise.attach (*apvts.getParameter (ParamIds::noise), { 2, 1, 0 });
+    quality.attach (*apvts.getParameter (ParamIds::quality), { 2, 1, 0 });
+    meterSelect.setPosition ((int) apvts.state.getProperty (kMeterChannel, 0), juce::dontSendNotification);
+    meterSelect.onChange = [&apvts] (int pos) { apvts.state.setProperty (kMeterChannel, pos, nullptr); };
+
+    const std::pair<dfd::ui::ToggleSwitch*, juce::Point<int>> toggles[] = {
+        { &color, { 0, 0 } }, { &wetOnly, { 1, 0 } }, { &noise, { 0, 1 } }, { &quality, { 1, 1 } }, { &meterSelect, { 0, 2 } }
+    };
+    for (auto [t, cell] : toggles)
+    {
+        t->setBounds (layout::toggle (cell.x, cell.y));
+        face.addAndMakeVisible (t);
+    }
+    lamp.setBounds (layout::toggle (1, 2).withSize (36, 36).translated (-3, 14));
+    face.addAndMakeVisible (lamp);
+    face.setLookAndFeel (&look); // after the children exist, so their text boxes pick it up
+
+    const float scale = juce::jlimit (kMinScale, kMaxScale, (float) (double) apvts.state.getProperty (kUiScale, layout::kDefaultScale));
+    setResizable (true, true);
+    setResizeLimits (juce::roundToInt (layout::kWidth * kMinScale), juce::roundToInt (layout::kHeight * kMinScale),
+                     juce::roundToInt (layout::kWidth * kMaxScale), juce::roundToInt (layout::kHeight * kMaxScale));
+    getConstrainer()->setFixedAspectRatio ((double) layout::kWidth / layout::kHeight);
+    setSize (juce::roundToInt (layout::kWidth * scale), juce::roundToInt (layout::kHeight * scale));
+    sizeRestored = true;
+
+    lastBlocks = processor.metering().processedBlocks.load();
+    lastTickMs = juce::Time::getMillisecondCounterHiRes();
+    timerCallback();
+    startTimerHz (60);
 }
 
 DamnFineDelayEditor::~DamnFineDelayEditor()
 {
     stopTimer();
-    setLookAndFeel (nullptr);
+    face.setLookAndFeel (nullptr);
 }
 
-void DamnFineDelayEditor::setUpKnob (Knob& k, const char* paramId, const juce::String& name)
+void DamnFineDelayEditor::addKnob (Knob& k, const char* paramId, layout::KnobSpot spot)
 {
-    k.slider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
-    k.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 90, 20);
-    k.label.setText (name, juce::dontSendNotification);
-    k.label.setJustificationType (juce::Justification::centred);
-    k.label.setFont (juce::FontOptions (12.0f, juce::Font::bold));
-    addAndMakeVisible (k.slider);
-    addAndMakeVisible (k.label);
+    k.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 80, 16);
+    k.slider.setBounds (layout::knobBounds (spot));
+    k.slider.setTitle (spot.label);
+    face.addAndMakeVisible (k.slider);
     k.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.state(), paramId, k.slider);
-}
-
-void DamnFineDelayEditor::setUpChoice (Choice& c, const char* paramId, const juce::String& name)
-{
-    if (auto* param = dynamic_cast<juce::AudioParameterChoice*> (processor.state().getParameter (paramId)))
-        c.box.addItemList (param->choices, 1);
-    c.label.setText (name, juce::dontSendNotification);
-    c.label.setFont (juce::FontOptions (12.0f, juce::Font::bold));
-    addAndMakeVisible (c.box);
-    addAndMakeVisible (c.label);
-    c.attachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (processor.state(), paramId, c.box);
-}
-
-void DamnFineDelayEditor::paint (juce::Graphics& g)
-{
-    g.fillAll (kPanel);
-    auto area = getLocalBounds().reduced (14);
-    g.setColour (kPanelEdge);
-    g.drawRoundedRectangle (area.toFloat(), 6.0f, 1.0f);
-
-    auto header = area.removeFromTop (56).reduced (16, 10);
-    g.setColour (kInk);
-    g.setFont (juce::FontOptions (26.0f, juce::Font::bold));
-    g.drawText ("DAMN FINE DELAY", header.removeFromLeft (360), juce::Justification::centredLeft);
-    g.setColour (kAccent);
-    g.setFont (juce::FontOptions (13.0f));
-    g.drawText ("MODEL 1416  ACOUSTIC TUBE DELAY", header, juce::Justification::centredRight);
+    if (auto* param = processor.state().getParameter (paramId))
+        k.slider.setDoubleClickReturnValue (true, param->convertFrom0to1 (param->getDefaultValue()));
 }
 
 void DamnFineDelayEditor::resized()
 {
-    auto area = getLocalBounds().reduced (14);
-    status.setBounds (area.removeFromBottom (22).reduced (16, 0));
-    area.removeFromTop (56);
-    area = area.reduced (16, 6);
+    const float scale = (float) getWidth() / (float) layout::kWidth;
+    face.setBounds (0, 0, layout::kWidth, layout::kHeight);
+    face.setTransform (juce::AffineTransform::scale (scale));
+    if (sizeRestored && scale >= kMinScale * 0.99f)
+        processor.state().state.setProperty (kUiScale, scale, nullptr);
+}
 
-    auto selectors = area.removeFromTop (56);
-    const int choiceW = selectors.getWidth() / (int) choices.size();
-    for (auto& c : choices)
-    {
-        auto cell = selectors.removeFromLeft (choiceW).reduced (6, 0);
-        c.label.setBounds (cell.removeFromTop (20));
-        c.box.setBounds (cell.removeFromTop (28));
-    }
+void DamnFineDelayEditor::timerCallback()
+{
+    const double now = juce::Time::getMillisecondCounterHiRes();
+    const double dt = juce::jlimit (0.0, 0.1, (now - lastTickMs) / 1000.0);
+    lastTickMs = now;
 
-    area.removeFromTop (14);
-    const int knobW = area.getWidth() / (int) knobs.size();
-    for (auto& k : knobs)
+    auto& m = processor.metering();
+    const int numIn = m.numIn.load(), numOut = m.numOut.load();
+    const auto in0 = m.in[0].take(), in1 = m.in[1].take(), out0 = m.out[0].take(), out1 = m.out[1].take();
+    inMeters.update ({ in0.peak, in1.peak }, dt);
+    outMeters.update ({ out0.peak, out1.peak }, dt);
+
+    auto& apvts = processor.state();
+    const int route = juce::roundToInt (apvts.getRawParameterValue (ParamIds::routing)->load());
+    const auto outs = outputLabels (numOut, route);
+    inMeters.setChannelLabels (inputLabels (numIn, route));
+    outMeters.setChannelLabels (outs);
+
+    const int vuChannel = numOut > 1 ? meterSelect.getPosition() : 0;
+    vu.update (vuChannel == 0 ? out0.rms : out1.rms, dt);
+    vu.setChannelName (outs[vuChannel]);
+
+    diagram.setState ({ route, apvts.getRawParameterValue (ParamIds::temperature)->load(), numIn, numOut });
+
+    const auto blocks = m.processedBlocks.load();
+    if (blocks != lastBlocks)
     {
-        auto cell = area.removeFromLeft (knobW).reduced (4, 0);
-        k.label.setBounds (cell.removeFromTop (20));
-        k.slider.setBounds (cell.removeFromTop (130));
+        lastBlocks = blocks;
+        lastActiveMs = now;
     }
+    lamp.setLit (now - lastActiveMs < 250.0);
 }

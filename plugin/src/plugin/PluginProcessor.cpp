@@ -8,12 +8,18 @@ using APVTS = juce::AudioProcessorValueTreeState;
 
 juce::NormalisableRange<float> dbRange (float lo, float hi) { return { lo, hi, 0.1f }; }
 
-float peakDb (const juce::AudioBuffer<float>& b, int channels)
+void atomicMax (std::atomic<float>& a, float v) noexcept
 {
-    float peak = 0.0f;
-    for (int ch = 0; ch < juce::jmin (channels, b.getNumChannels()); ++ch)
-        peak = juce::jmax (peak, b.getMagnitude (ch, 0, b.getNumSamples()));
-    return juce::Decibels::gainToDecibels (peak, -100.0f);
+    for (float cur = a.load (std::memory_order_relaxed); v > cur && ! a.compare_exchange_weak (cur, v, std::memory_order_relaxed);)
+    {
+    }
+}
+
+void atomicAdd (std::atomic<float>& a, float v) noexcept
+{
+    for (float cur = a.load (std::memory_order_relaxed); ! a.compare_exchange_weak (cur, cur + v, std::memory_order_relaxed);)
+    {
+    }
 }
 
 juce::AudioParameterFloatAttributes dbAttributes()
@@ -35,9 +41,10 @@ APVTS::ParameterLayout DamnFineDelayProcessor::createLayout()
     layout.add (std::make_unique<AudioParameterChoice> (ParameterID { ParamIds::color, 1 }, "Color",
                                                         StringArray { "A (original)", "B (leveled)" }, 0));
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::drive, 1 }, "Drive", dbRange (-20.0f, 20.0f), 0.0f, dbAttributes()));
-    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::mix, 1 }, "Mix", NormalisableRange<float> { 0.0f, 100.0f, 0.1f }, 100.0f,
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::mix, 1 }, "Mix", NormalisableRange<float> { 0.0f, 100.0f, 0.1f }, 40.0f,
                                                        AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction (
                                                            [] (float v, int) { return String (v, 1) + " %"; })));
+    layout.add (std::make_unique<AudioParameterBool> (ParameterID { ParamIds::wetOnly, 2 }, "Wet Only", false));
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::levelA, 1 }, "Level A", dbRange (-48.0f, 10.0f), 0.0f, dbAttributes()));
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::levelB, 1 }, "Level B", dbRange (-48.0f, 10.0f), 0.0f, dbAttributes()));
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::output, 1 }, "Output", dbRange (-15.0f, 15.0f), 0.0f, dbAttributes()));
@@ -62,6 +69,7 @@ DamnFineDelayProcessor::DamnFineDelayProcessor()
     raw.color = apvts.getRawParameterValue (ParamIds::color);
     raw.drive = apvts.getRawParameterValue (ParamIds::drive);
     raw.mix = apvts.getRawParameterValue (ParamIds::mix);
+    raw.wetOnly = apvts.getRawParameterValue (ParamIds::wetOnly);
     raw.levelA = apvts.getRawParameterValue (ParamIds::levelA);
     raw.levelB = apvts.getRawParameterValue (ParamIds::levelB);
     raw.output = apvts.getRawParameterValue (ParamIds::output);
@@ -93,7 +101,7 @@ dfd::EngineParams DamnFineDelayProcessor::currentParams() const
     p.routing = static_cast<dfd::Routing> (juce::jlimit (0, 2, (int) raw.routing->load()));
     p.color = (int) raw.color->load() == 0 ? dfd::Color::A : dfd::Color::B;
     p.driveDb = raw.drive->load();
-    p.mix = raw.mix->load() / 100.0;
+    p.mix = raw.wetOnly->load() >= 0.5f ? 1.0 : raw.mix->load() / 100.0;
     p.levelADb = raw.levelA->load() <= -47.95f ? -300.0 : raw.levelA->load();
     p.levelBDb = raw.levelB->load() <= -47.95f ? -300.0 : raw.levelB->load();
     p.outputDb = raw.output->load();
@@ -104,6 +112,8 @@ dfd::EngineParams DamnFineDelayProcessor::currentParams() const
 void DamnFineDelayProcessor::prepareToPlay (double sampleRate, int)
 {
     currentRate = sampleRate;
+    meters.numIn.store (getTotalNumInputChannels());
+    meters.numOut.store (getTotalNumOutputChannels());
     engine.prepare (sampleRate, currentSetup(), currentParams());
     setLatencySamples (engine.latencySamples());
 }
@@ -136,9 +146,35 @@ bool DamnFineDelayProcessor::isBusesLayoutSupported (const BusesLayout& layouts)
     return inOk && outOk && ! (in == juce::AudioChannelSet::stereo() && out == juce::AudioChannelSet::mono());
 }
 
-void DamnFineDelayProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void DamnFineDelayProcessor::LevelTap::push (const float* x, int n) noexcept
 {
-    juce::ScopedNoDenormals noDenormals;
+    float p = 0.0f, sum = 0.0f;
+    for (int i = 0; i < n; ++i)
+    {
+        p = juce::jmax (p, std::abs (x[i]));
+        sum += x[i] * x[i];
+    }
+    atomicMax (peak, p);
+    atomicAdd (sumSquares, sum);
+    count.fetch_add (n, std::memory_order_relaxed);
+}
+
+DamnFineDelayProcessor::LevelTap::Reading DamnFineDelayProcessor::LevelTap::take() noexcept
+{
+    const float p = peak.exchange (0.0f, std::memory_order_relaxed);
+    const float sum = sumSquares.exchange (0.0f, std::memory_order_relaxed);
+    const int n = count.exchange (0, std::memory_order_relaxed);
+    return { p, n > 0 ? std::sqrt (sum / (float) n) : 0.0f };
+}
+
+void DamnFineDelayProcessor::meterBlock (std::array<LevelTap, 2>& taps, const juce::AudioBuffer<float>& b, int channels) noexcept
+{
+    for (int ch = 0; ch < juce::jmin (2, channels, b.getNumChannels()); ++ch)
+        taps[(size_t) ch].push (b.getReadPointer (ch), b.getNumSamples());
+}
+
+std::pair<float*, float*> DamnFineDelayProcessor::prepareChannels (juce::AudioBuffer<float>& buffer)
+{
     const int numIn = getTotalNumInputChannels(), numOut = getTotalNumOutputChannels();
     const int n = buffer.getNumSamples();
     if (numIn == 1 && numOut == 2)
@@ -146,25 +182,28 @@ void DamnFineDelayProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     else
         for (int ch = numIn; ch < numOut; ++ch)
             buffer.clear (ch, 0, n);
-
-    diag.numIn.store (numIn);
-    diag.numOut.store (numOut);
-    diag.sampleRate.store (getSampleRate());
-    diag.inDb.store (peakDb (buffer, numIn));
-
-    engine.setParams (currentParams());
-    float* left = buffer.getWritePointer (0);
-    float* right = numOut > 1 ? buffer.getWritePointer (1) : nullptr;
-    engine.process (left, right, n);
-
-    diag.outDb.store (peakDb (buffer, numOut));
-    diag.blocks.fetch_add (1);
+    meters.numIn.store (numIn, std::memory_order_relaxed);
+    meters.numOut.store (numOut, std::memory_order_relaxed);
+    meterBlock (meters.in, buffer, numIn);
+    return { buffer.getWritePointer (0), numOut > 1 ? buffer.getWritePointer (1) : nullptr };
 }
 
-void DamnFineDelayProcessor::processBlockBypassed (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+void DamnFineDelayProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
-    diag.bypassedBlocks.fetch_add (1);
-    AudioProcessor::processBlockBypassed (buffer, midi);
+    juce::ScopedNoDenormals noDenormals;
+    const auto [left, right] = prepareChannels (buffer);
+    engine.setParams (currentParams());
+    engine.process (left, right, buffer.getNumSamples());
+    meterBlock (meters.out, buffer, getTotalNumOutputChannels());
+    meters.processedBlocks.fetch_add (1, std::memory_order_relaxed);
+}
+
+void DamnFineDelayProcessor::processBlockBypassed (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+{
+    juce::ScopedNoDenormals noDenormals;
+    const auto [left, right] = prepareChannels (buffer);
+    engine.processBypassed (left, right, buffer.getNumSamples());
+    meterBlock (meters.out, buffer, getTotalNumOutputChannels());
 }
 
 juce::AudioProcessorEditor* DamnFineDelayProcessor::createEditor()

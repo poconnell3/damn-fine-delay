@@ -10,6 +10,7 @@ inline constexpr auto routing = "routing";
 inline constexpr auto color = "color";
 inline constexpr auto drive = "drive";
 inline constexpr auto mix = "mix";
+inline constexpr auto wetOnly = "wetOnly";
 inline constexpr auto levelA = "levelA";
 inline constexpr auto levelB = "levelB";
 inline constexpr auto output = "output";
@@ -56,15 +57,30 @@ public:
 
     juce::AudioProcessorValueTreeState& state() noexcept { return apvts; }
 
-    /** Live status for the editor's diagnostics line (written on the audio thread, read on the UI thread). */
-    struct Diagnostics
+    /** Lock-free level tap: the audio thread accumulates, the UI takes and resets. */
+    class LevelTap
     {
-        std::atomic<std::uint64_t> blocks { 0 }, bypassedBlocks { 0 };
-        std::atomic<float> inDb { -100.0f }, outDb { -100.0f };
-        std::atomic<int> numIn { 0 }, numOut { 0 };
-        std::atomic<double> sampleRate { 0.0 };
+    public:
+        struct Reading
+        {
+            float peak = 0.0f, rms = 0.0f;
+        };
+
+        void push (const float* x, int n) noexcept;
+        Reading take() noexcept;
+
+    private:
+        std::atomic<float> peak { 0.0f }, sumSquares { 0.0f };
+        std::atomic<int> count { 0 };
     };
-    const Diagnostics& diagnostics() const noexcept { return diag; }
+
+    struct Metering
+    {
+        std::array<LevelTap, 2> in, out;
+        std::atomic<int> numIn { 2 }, numOut { 2 };
+        std::atomic<std::uint32_t> processedBlocks { 0 };
+    };
+    Metering& metering() noexcept { return meters; }
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
 
@@ -72,7 +88,7 @@ private:
     juce::AudioProcessorValueTreeState apvts;
     dfd::Engine engine;
     double currentRate = 0.0;
-    Diagnostics diag;
+    Metering meters;
 
     struct Raw
     {
@@ -80,6 +96,7 @@ private:
         std::atomic<float>* color;
         std::atomic<float>* drive;
         std::atomic<float>* mix;
+        std::atomic<float>* wetOnly;
         std::atomic<float>* levelA;
         std::atomic<float>* levelB;
         std::atomic<float>* output;
@@ -91,6 +108,8 @@ private:
     dfd::EngineSetup currentSetup() const;
     dfd::EngineParams currentParams() const;
     void rebuildEngine();
+    std::pair<float*, float*> prepareChannels (juce::AudioBuffer<float>&);
+    void meterBlock (std::array<LevelTap, 2>&, const juce::AudioBuffer<float>&, int channels) noexcept;
 
     void parameterChanged (const juce::String& id, float) override;
     void handleAsyncUpdate() override;

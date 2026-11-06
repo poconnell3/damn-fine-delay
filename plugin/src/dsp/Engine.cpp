@@ -50,7 +50,7 @@ void Engine::prepare (double sampleRate, const EngineSetup& setup, const EngineP
     reset();
 }
 
-void Engine::reset()
+void Engine::clearWet() noexcept
 {
     lineA.reset();
     lineB.reset();
@@ -58,6 +58,12 @@ void Engine::reset()
         o->reset();
     leakAtoB.reset();
     leakBtoA.reset();
+}
+
+void Engine::reset()
+{
+    clearWet();
+    wetCleared = false;
     for (auto& d : dryDelay)
         std::fill (d.begin(), d.end(), 0.0);
     dryPos = 0;
@@ -116,16 +122,10 @@ void Engine::processSample (double inL, double inR, double& outL, double& outR) 
     }
 
     // Dry path, delayed to match the wet path's oversampling latency.
-    auto& dl = dryDelay[0];
-    auto& dr = dryDelay[1];
-    const size_t n = dl.size();
-    dl[dryPos] = inL;
-    dr[dryPos] = inR;
-    const size_t readPos = (dryPos + 1) % n; // oldest sample = latency samples ago
-    const double dryL = dl[readPos], dryR = dr[readPos];
+    double dryR;
+    const double dryL = pushDry (inL, inR, dryR);
     const double dryA = params.routing == Routing::Dual ? dryL : 0.5 * (dryL + dryR);
     const double dryB = params.routing == Routing::Dual ? dryR : dryA;
-    dryPos = readPos;
 
     if (params.crosstalk && params.routing != Routing::Cascade)
     {
@@ -149,8 +149,38 @@ void Engine::processSample (double inL, double inR, double& outL, double& outR) 
     outR = out * ((1.0 - m) * dryR + m * outR);
 }
 
+double Engine::pushDry (double inL, double inR, double& dryR) noexcept
+{
+    auto& dl = dryDelay[0];
+    auto& dr = dryDelay[1];
+    dl[dryPos] = inL;
+    dr[dryPos] = inR;
+    dryPos = (dryPos + 1) % dl.size(); // oldest sample = latency samples ago
+    dryR = dr[dryPos];
+    return dl[dryPos];
+}
+
+void Engine::processBypassed (float* left, float* right, int numSamples) noexcept
+{
+    if (! wetCleared)
+    {
+        clearWet();
+        wetCleared = true;
+    }
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const double inL = left[i];
+        const double inR = right != nullptr ? right[i] : inL;
+        double dryR;
+        left[i] = (float) pushDry (inL, inR, dryR);
+        if (right != nullptr && right != left)
+            right[i] = (float) dryR;
+    }
+}
+
 void Engine::process (float* left, float* right, int numSamples) noexcept
 {
+    wetCleared = false;
     for (int i = 0; i < numSamples; ++i)
     {
         const double inL = left[i];

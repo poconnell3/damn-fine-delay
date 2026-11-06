@@ -53,6 +53,10 @@ public:
     /** In-place stereo processing (either pointer may alias the other for mono hosts). */
     void process (float* left, float* right, int numSamples) noexcept;
 
+    /** Bypass: the input delayed by latencySamples(), through the same dry delay as process(), so
+        switching in and out is seamless. The lines are cleared on entry and restart from silence. */
+    void processBypassed (float* left, float* right, int numSamples) noexcept;
+
     /** Offline helpers for tests: process one base-rate sample per call. */
     void processSample (double inL, double inR, double& outL, double& outR) noexcept;
 
@@ -74,11 +78,14 @@ private:
     double extraSeconds = 0.0; // sub-sample latency trim, added to the wet path
     std::array<std::vector<double>, 2> dryDelay;
     size_t dryPos = 0;
+    bool wetCleared = false;
     Cascade leakAtoB, leakBtoA;
     Smoothed drive, mix, levelA, levelB, output;
     std::array<double, 4> bufA {}, bufB {};
 
     void applyRoutingDelays (bool immediate) noexcept;
+    void clearWet() noexcept;
+    double pushDry (double inL, double inR, double& dryR) noexcept;
 };
 
 } // namespace dfd
