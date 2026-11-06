@@ -5,7 +5,8 @@
 #include "PluginProcessor.h"
 
 /** Functional v0.1 editor: two rows of rotary controls and the mode selectors, on a plain rack-panel look. */
-class DamnFineDelayEditor final : public juce::AudioProcessorEditor
+class DamnFineDelayEditor final : public juce::AudioProcessorEditor,
+                                  private juce::Timer
 {
 public:
     explicit DamnFineDelayEditor (DamnFineDelayProcessor&);
@@ -40,6 +41,9 @@ private:
     PanelLook look;
     std::array<Knob, 6> knobs;
     std::array<Choice, 4> choices;
+    juce::Label status;
+
+    void timerCallback() override;
 
     void setUpKnob (Knob&, const char* paramId, const juce::String& name);
     void setUpChoice (Choice&, const char* paramId, const juce::String& name);

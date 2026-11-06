@@ -32,7 +32,9 @@ public:
     void releaseResources() override {}
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    void processBlockBypassed (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     using AudioProcessor::processBlock;
+    using AudioProcessor::processBlockBypassed;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -54,12 +56,23 @@ public:
 
     juce::AudioProcessorValueTreeState& state() noexcept { return apvts; }
 
+    /** Live status for the editor's diagnostics line (written on the audio thread, read on the UI thread). */
+    struct Diagnostics
+    {
+        std::atomic<std::uint64_t> blocks { 0 }, bypassedBlocks { 0 };
+        std::atomic<float> inDb { -100.0f }, outDb { -100.0f };
+        std::atomic<int> numIn { 0 }, numOut { 0 };
+        std::atomic<double> sampleRate { 0.0 };
+    };
+    const Diagnostics& diagnostics() const noexcept { return diag; }
+
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
 
 private:
     juce::AudioProcessorValueTreeState apvts;
     dfd::Engine engine;
     double currentRate = 0.0;
+    Diagnostics diag;
 
     struct Raw
     {

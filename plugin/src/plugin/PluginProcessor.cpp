@@ -8,6 +8,14 @@ using APVTS = juce::AudioProcessorValueTreeState;
 
 juce::NormalisableRange<float> dbRange (float lo, float hi) { return { lo, hi, 0.1f }; }
 
+float peakDb (const juce::AudioBuffer<float>& b, int channels)
+{
+    float peak = 0.0f;
+    for (int ch = 0; ch < juce::jmin (channels, b.getNumChannels()); ++ch)
+        peak = juce::jmax (peak, b.getMagnitude (ch, 0, b.getNumSamples()));
+    return juce::Decibels::gainToDecibels (peak, -100.0f);
+}
+
 juce::AudioParameterFloatAttributes dbAttributes()
 {
     return juce::AudioParameterFloatAttributes()
@@ -139,10 +147,24 @@ void DamnFineDelayProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
         for (int ch = numIn; ch < numOut; ++ch)
             buffer.clear (ch, 0, n);
 
+    diag.numIn.store (numIn);
+    diag.numOut.store (numOut);
+    diag.sampleRate.store (getSampleRate());
+    diag.inDb.store (peakDb (buffer, numIn));
+
     engine.setParams (currentParams());
     float* left = buffer.getWritePointer (0);
     float* right = numOut > 1 ? buffer.getWritePointer (1) : nullptr;
     engine.process (left, right, n);
+
+    diag.outDb.store (peakDb (buffer, numOut));
+    diag.blocks.fetch_add (1);
+}
+
+void DamnFineDelayProcessor::processBlockBypassed (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+{
+    diag.bypassedBlocks.fetch_add (1);
+    AudioProcessor::processBlockBypassed (buffer, midi);
 }
 
 juce::AudioProcessorEditor* DamnFineDelayProcessor::createEditor()

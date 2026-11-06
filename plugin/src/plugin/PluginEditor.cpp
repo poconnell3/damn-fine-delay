@@ -65,12 +65,30 @@ DamnFineDelayEditor::DamnFineDelayEditor (DamnFineDelayProcessor& p)
     setUpChoice (choices[1], ParamIds::color, "COLOR");
     setUpChoice (choices[2], ParamIds::noise, "NOISE");
     setUpChoice (choices[3], ParamIds::quality, "QUALITY");
+    status.setFont (juce::FontOptions (12.0f));
+    status.setColour (juce::Label::textColourId, kInkDim);
+    addAndMakeVisible (status);
+    timerCallback();
+    startTimerHz (10);
     setResizable (false, false);
-    setSize (720, 340);
+    setSize (720, 360);
+}
+
+void DamnFineDelayEditor::timerCallback()
+{
+    const auto& d = processor.diagnostics();
+    const auto blocks = d.blocks.load(), bypassed = d.bypassedBlocks.load();
+    juce::String text;
+    text << juce::String (d.sampleRate.load() / 1000.0, 1) << " kHz   " << d.numIn.load() << " in / " << d.numOut.load() << " out   "
+         << "blocks " << juce::String ((juce::int64) blocks) << " (bypassed " << juce::String ((juce::int64) bypassed) << ")   "
+         << "in " << juce::String (d.inDb.load(), 1) << " dB   out " << juce::String (d.outDb.load(), 1) << " dB   "
+         << "latency " << processor.getLatencySamples() << (processor.isSuspended() ? "   SUSPENDED" : "");
+    status.setText (text, juce::dontSendNotification);
 }
 
 DamnFineDelayEditor::~DamnFineDelayEditor()
 {
+    stopTimer();
     setLookAndFeel (nullptr);
 }
 
@@ -116,6 +134,7 @@ void DamnFineDelayEditor::paint (juce::Graphics& g)
 void DamnFineDelayEditor::resized()
 {
     auto area = getLocalBounds().reduced (14);
+    status.setBounds (area.removeFromBottom (22).reduced (16, 0));
     area.removeFromTop (56);
     area = area.reduced (16, 6);
 
