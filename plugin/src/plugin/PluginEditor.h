@@ -35,8 +35,7 @@ private:
     dfd::ui::ToggleSwitch color { { "A", "B" } }, wetOnly { { "ON", "OFF" } };
     dfd::ui::ToggleSwitch noise { { "XTRA", "AUTH", "OFF" } }, quality { { "4x", "2x", "1x" } };
     dfd::ui::ToggleSwitch meterSelect { { "A", "B" } };
-    dfd::ui::ToggleSwitch modeSwitch { { "NORMAL", "DOUBLE" }, dfd::ui::ToggleSwitch::Orientation::horizontal };
-    dfd::ui::ToggleSwitch personaSwitch { { "ROBOT", "HUMAN" }, dfd::ui::ToggleSwitch::Orientation::horizontal };
+    dfd::ui::LampButton doubleButton { "DOUBLE" }, humanizeButton { "HUMANIZE" };
     dfd::ui::RotarySelector routing;
     dfd::ui::PilotLamp lamp;
 

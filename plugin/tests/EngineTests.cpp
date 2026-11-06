@@ -451,7 +451,7 @@ std::vector<double> doublerArrivals (bool human, double humanMs, double seconds)
 
 void testHumanPersona()
 {
-    std::puts ("human persona (random drift both ways within +-amount; robot is exact)");
+    std::puts ("humanize (random drift both ways within +-amount; off is exact)");
     auto range = [] (const std::vector<double>& v)
     {
         const auto [lo, hi] = std::minmax_element (v.begin(), v.end());
@@ -459,12 +459,12 @@ void testHumanPersona()
     };
     const auto robot = range (doublerArrivals (false, 5.0, 8.0));
     check (std::abs (robot.first) < 0.05 && std::abs (robot.second) < 0.05,
-           fmt ("robot: arrivals %.3f..%.3f ms from 30 ms", robot.first, robot.second));
+           fmt ("humanize off: arrivals %.3f..%.3f ms from 30 ms", robot.first, robot.second));
     for (double amount : { 2.0, 5.0 })
     {
         const auto h = range (doublerArrivals (true, amount, 24.0));
-        check (h.first > -amount - 0.3 && h.second < amount + 0.3, fmt ("human +-%.0f ms: arrivals %.2f..%.2f ms", amount, h.first, h.second));
-        check (h.first < -0.25 * amount && h.second > 0.25 * amount, fmt ("human +-%.0f ms: drifts both earlier (%.2f) and later (%.2f)", amount, h.first, h.second));
+        check (h.first > -amount - 0.3 && h.second < amount + 0.3, fmt ("humanize +-%.0f ms: arrivals %.2f..%.2f ms", amount, h.first, h.second));
+        check (h.first < -0.25 * amount && h.second > 0.25 * amount, fmt ("humanize +-%.0f ms: drifts both earlier (%.2f) and later (%.2f)", amount, h.first, h.second));
     }
 }
 

@@ -46,6 +46,25 @@ private:
     void paintLever (juce::Graphics&, juce::Point<float> nut, juce::Point<float> direction, float len) const;
 };
 
+/** Latching illuminated push button (grey housing, translucent red cap), attached to a bool parameter. */
+class LampButton final : public juce::Component
+{
+public:
+    explicit LampButton (juce::String text);
+
+    void attach (juce::RangedAudioParameter&);
+    bool isOn() const noexcept { return on; }
+
+    void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+
+private:
+    juce::String text;
+    bool on = false, pressed = false;
+    std::unique_ptr<juce::ParameterAttachment> attachment;
+};
+
 /** Pointer knob that snaps between labelled positions spread over the top arc. */
 class RotarySelector final : public juce::Component
 {

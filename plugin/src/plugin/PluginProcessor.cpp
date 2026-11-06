@@ -80,8 +80,8 @@ APVTS::ParameterLayout DamnFineDelayProcessor::createLayout()
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::dryLevel, 3 }, "Dry Level", dbRange (-48.0f, 10.0f), 0.0f, dbAttributes()));
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::wetPan, 3 }, "Delay Pan", NormalisableRange<float> { -100.0f, 100.0f, 1.0f }, 60.0f, panAttributes()));
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::wetLevel, 3 }, "Delay Level", dbRange (-48.0f, 10.0f), 0.0f, dbAttributes()));
-    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { ParamIds::persona, 4 }, "Persona", StringArray { "Robot", "Human" }, 0));
-    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::humanAmount, 4 }, "Human Amount", NormalisableRange<float> { 0.0f, 10.0f, 0.1f }, 3.0f,
+    layout.add (std::make_unique<AudioParameterBool> (ParameterID { ParamIds::humanize, 5 }, "Humanize", false));
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamIds::humanAmount, 4 }, "Humanize Amount", NormalisableRange<float> { 0.0f, 10.0f, 0.1f }, 3.0f,
                                                        AudioParameterFloatAttributes().withLabel ("ms").withStringFromValueFunction (
                                                            [] (float v, int) { return String (CharPointer_UTF8 ("\xc2\xb1")) + String (v, 1) + " ms"; })));
     return layout;
@@ -109,7 +109,7 @@ DamnFineDelayProcessor::DamnFineDelayProcessor()
     raw.dryLevel = apvts.getRawParameterValue (ParamIds::dryLevel);
     raw.wetPan = apvts.getRawParameterValue (ParamIds::wetPan);
     raw.wetLevel = apvts.getRawParameterValue (ParamIds::wetLevel);
-    raw.persona = apvts.getRawParameterValue (ParamIds::persona);
+    raw.humanize = apvts.getRawParameterValue (ParamIds::humanize);
     raw.humanAmount = apvts.getRawParameterValue (ParamIds::humanAmount);
     apvts.addParameterListener (ParamIds::quality, this);
     apvts.addParameterListener (ParamIds::temperature, this);
@@ -148,7 +148,7 @@ dfd::EngineParams DamnFineDelayProcessor::currentParams() const
     p.wetPan = raw.wetPan->load() / 100.0;
     p.dryLevelDb = levelDb (raw.dryLevel);
     p.wetLevelDb = levelDb (raw.wetLevel);
-    p.human = raw.persona->load() >= 0.5f;
+    p.human = raw.humanize->load() >= 0.5f;
     p.humanMs = raw.humanAmount->load();
     return p;
 }

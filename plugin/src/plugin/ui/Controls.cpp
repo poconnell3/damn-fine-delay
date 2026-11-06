@@ -210,6 +210,86 @@ void ToggleSwitch::paint (juce::Graphics& g)
     paintLever (g, c, orientation == Orientation::vertical ? juce::Point<float> { 0.0f, sign } : juce::Point<float> { sign, 0.0f }, len);
 }
 
+// ------------------------------------------------------------------------------------------- LampButton
+
+LampButton::LampButton (juce::String buttonText) : text (std::move (buttonText))
+{
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    setTitle (text);
+}
+
+void LampButton::attach (juce::RangedAudioParameter& param)
+{
+    attachment = std::make_unique<juce::ParameterAttachment> (param, [this] (float v)
+    {
+        on = v >= 0.5f;
+        repaint();
+    });
+    attachment->sendInitialUpdate();
+}
+
+void LampButton::mouseDown (const juce::MouseEvent&)
+{
+    pressed = true;
+    repaint();
+}
+
+void LampButton::mouseUp (const juce::MouseEvent& e)
+{
+    pressed = false;
+    if (attachment != nullptr && getLocalBounds().contains (e.getPosition()))
+        attachment->setValueAsCompleteGesture (on ? 0.0f : 1.0f);
+    repaint();
+}
+
+void LampButton::paint (juce::Graphics& g)
+{
+    // Modelled on illuminated square push buttons: a light grey plastic housing holding a translucent red cap
+    // with a raised rim; lit from behind, the rim glows hottest and the centre reads orange.
+    const auto housing = getLocalBounds().toFloat().reduced (4.0f);
+
+    if (on)
+        for (float spread : { 6.0f, 3.5f })
+        {
+            g.setColour (juce::Colour (0xffff3a14).withAlpha (spread > 5.0f ? 0.12f : 0.22f));
+            g.fillRoundedRectangle (housing.expanded (spread), 4.0f + spread);
+        }
+
+    g.setColour (juce::Colours::black.withAlpha (0.55f));
+    g.fillRoundedRectangle (housing.translated (1.5f, 2.5f), 3.0f);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe6e2da), housing.getX(), housing.getY(),
+                                             juce::Colour (0xffa29d95), housing.getX(), housing.getBottom(), false));
+    g.fillRoundedRectangle (housing, 3.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.6f));
+    g.drawHorizontalLine ((int) housing.getY() + 1, housing.getX() + 3.0f, housing.getRight() - 3.0f);
+
+    auto cap = housing.reduced (3.5f);
+    if (pressed)
+        cap = cap.reduced (0.5f).translated (0.0f, 1.0f);
+    const auto inner = cap.reduced (3.5f);
+
+    // Rim, then the dome inside it.
+    g.setColour (on ? juce::Colour (0xffef3412) : juce::Colour (0xff5e130a));
+    g.fillRoundedRectangle (cap, 2.0f);
+    g.setGradientFill (on ? juce::ColourGradient (juce::Colour (0xffffb46e), inner.getCentreX(), inner.getCentreY() - 2.0f,
+                                                  juce::Colour (0xffff5c22), inner.getRight(), inner.getBottom(), true)
+                          : juce::ColourGradient (juce::Colour (0xff4f110a), inner.getCentreX(), inner.getCentreY() - 2.0f,
+                                                  juce::Colour (0xff320905), inner.getRight(), inner.getBottom(), true));
+    g.fillRoundedRectangle (inner, 1.5f);
+    g.setColour ((on ? juce::Colour (0xffa81c06) : juce::Colour (0xff220402)).withAlpha (0.8f));
+    g.drawRoundedRectangle (inner, 1.5f, 1.0f);
+
+    // Light catching the rim's lower edge and the top of the dome.
+    g.setColour (on ? juce::Colour (0xffffe2bf) : juce::Colours::white.withAlpha (0.10f));
+    g.fillRect (cap.getX() + 2.0f, cap.getBottom() - 2.2f, cap.getWidth() - 4.0f, 1.4f);
+    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (on ? 0.30f : 0.12f), inner.getX(), inner.getY(),
+                                             juce::Colours::white.withAlpha (0.0f), inner.getX(), inner.getY() + inner.getHeight() * 0.5f, false));
+    g.fillRect (inner.withHeight (inner.getHeight() * 0.5f));
+
+    // Printed legend: dark against the lit dome, pale when unlit.
+    silkText (g, text, inner, 10.0f, juce::Justification::centred, on ? juce::Colour (0xff4a0c04) : juce::Colour (0xffd59a8c));
+}
+
 // ------------------------------------------------------------------------------------------- RotarySelector
 
 RotarySelector::RotarySelector (juce::RangedAudioParameter& param, juce::StringArray shortLegends)

@@ -1,5 +1,5 @@
 // Renders the editor to a PNG after feeding it test audio, so the panel can be checked without a host.
-// Usage: dfd_ui_snapshot out.png [scale] [routing 0-2] [numIn 1-2] [numOut 1-2] [doubler 0-1] [human 0-1]
+// Usage: dfd_ui_snapshot out.png [scale] [routing 0-2] [numIn 1-2] [numOut 1-2] [doubler 0-1] [humanize 0-1]
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -9,7 +9,7 @@ int main (int argc, char** argv)
 {
     if (argc < 2)
     {
-        std::fprintf (stderr, "usage: %s out.png [scale] [routing] [numIn] [numOut] [doubler] [human]\n", argv[0]);
+        std::fprintf (stderr, "usage: %s out.png [scale] [routing] [numIn] [numOut] [doubler] [humanize]\n", argv[0]);
         return 1;
     }
     juce::ScopedJuceInitialiser_GUI init;
@@ -34,7 +34,7 @@ int main (int argc, char** argv)
     {
         if (p->getName (64) == "Double Mode")
             p->setValueNotifyingHost (doubler ? 1.0f : 0.0f);
-        if (p->getName (64) == "Persona")
+        if (p->getName (64) == "Humanize")
             p->setValueNotifyingHost (human ? 1.0f : 0.0f);
     }
     proc->prepareToPlay (48000.0, 512);

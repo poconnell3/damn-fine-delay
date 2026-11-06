@@ -54,12 +54,12 @@ DamnFineDelayEditor::DamnFineDelayEditor (DamnFineDelayProcessor& p)
     wetOnly.attach (*apvts.getParameter (ParamIds::wetOnly), { 1, 0 });
     noise.attach (*apvts.getParameter (ParamIds::noise), { 2, 1, 0 });
     quality.attach (*apvts.getParameter (ParamIds::quality), { 2, 1, 0 });
-    modeSwitch.attach (*apvts.getParameter (ParamIds::doubler), { 0, 1 });
-    personaSwitch.attach (*apvts.getParameter (ParamIds::persona), { 0, 1 });
-    modeSwitch.setBounds (layout::modeSwitch);
-    personaSwitch.setBounds (layout::personaSwitch);
-    face.addAndMakeVisible (modeSwitch);
-    face.addAndMakeVisible (personaSwitch);
+    doubleButton.attach (*apvts.getParameter (ParamIds::doubler));
+    humanizeButton.attach (*apvts.getParameter (ParamIds::humanize));
+    doubleButton.setBounds (layout::doubleButton);
+    humanizeButton.setBounds (layout::humanizeButton);
+    face.addAndMakeVisible (doubleButton);
+    face.addAndMakeVisible (humanizeButton);
     meterSelect.setPosition ((int) apvts.state.getProperty (kMeterChannel, 0), juce::dontSendNotification);
     meterSelect.onChange = [&apvts] (int pos) { apvts.state.setProperty (kMeterChannel, pos, nullptr); };
 
@@ -110,7 +110,7 @@ void DamnFineDelayEditor::addKnob (Knob& k, const char* paramId, layout::KnobSpo
 void DamnFineDelayEditor::showMode (bool doubler, bool human)
 {
     // Double mode mixes with its own pan and level knobs; the normal mix controls and routing do nothing there.
-    // The persona section only applies in Double mode, and its amount only to Human.
+    // Humanize only applies in Double mode, and its amount only while it is on.
     auto setActive = [] (juce::Component& c, bool active)
     {
         c.setEnabled (active);
@@ -120,7 +120,7 @@ void DamnFineDelayEditor::showMode (bool doubler, bool human)
         setActive (knobs[i].slider, ! doubler);
     for (size_t i = 6; i <= 9; ++i)
         setActive (knobs[i].slider, doubler);
-    setActive (personaSwitch, doubler);
+    setActive (humanizeButton, doubler);
     setActive (knobs[10].slider, doubler && human);
     setActive (wetOnly, ! doubler);
     setActive (routing, ! doubler);
@@ -149,7 +149,7 @@ void DamnFineDelayEditor::timerCallback()
 
     auto& apvts = processor.state();
     const bool doubler = apvts.getRawParameterValue (ParamIds::doubler)->load() >= 0.5f;
-    const bool human = apvts.getRawParameterValue (ParamIds::persona)->load() >= 0.5f;
+    const bool human = apvts.getRawParameterValue (ParamIds::humanize)->load() >= 0.5f;
     if (const int mode = (int) doubler * 2 + (int) human; mode != shownMode)
     {
         shownMode = mode;

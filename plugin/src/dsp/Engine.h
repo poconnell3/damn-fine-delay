@@ -37,8 +37,8 @@ struct EngineParams
     double dryPan = -0.6, wetPan = 0.6;
     double dryLevelDb = 0.0, wetLevelDb = 0.0;
 
-    /** Human persona (doubler only): the 30 ms copy drifts slowly and randomly earlier and later,
-        by up to +-humanMs, like a second take played by hand. Robot (false) keeps it exact. */
+    /** Humanize (doubler only): the 30 ms copy drifts slowly and randomly earlier and later,
+        by up to +-humanMs, like a second take played by hand. Off keeps it exact. */
     bool human = false;
     double humanMs = 3.0;
 

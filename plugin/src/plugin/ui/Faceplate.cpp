@@ -130,15 +130,13 @@ void Faceplate::paintStatic (juce::Graphics& g)
     thumbScrew (g, { lp.getX() + 13.0f, lp.getCentreY() });
     thumbScrew (g, { lp.getRight() - 13.0f, lp.getCentreY() });
 
-    // Doubler plate: mode switch, persona switch and amount, then pan over level for the dry signal and the 30 ms cascade.
+    // Doubler plate: double and humanize buttons, the amount knob, then pan over level for the dry signal and the 30 ms cascade.
     const auto dp = doublerPlate.toFloat();
-    silkText (g, "MODE", modeTitle, 10.0f, juce::Justification::centredLeft);
-    silkText (g, "PERSONA", personaTitle, 10.0f, juce::Justification::centredLeft);
-    silkText (g, humanAmount.label, knobLabel (humanAmount), 9.5f, juce::Justification::centred, colours::silkDim);
+    silkText (g, humanAmount.label, humanAmountLabel, 9.5f, juce::Justification::centred, colours::silkDim);
     silkText (g, "DRY", dryHeader, 12.0f, juce::Justification::centred, colours::amberDim);
     silkText (g, "30 MS", wetHeader, 12.0f, juce::Justification::centred, colours::amberDim);
     g.setColour (colours::silkDim);
-    for (int y : { modeDivider, personaDivider })
+    for (int y : { modeDivider, humanizeDivider })
         g.drawHorizontalLine (y, dp.getX() + 10.0f, dp.getRight() - 10.0f);
     g.drawVerticalLine ((int) dp.getCentreX(), dryHeader.getY(), dp.getBottom() - 4.0f);
     for (auto k : { dryPan, dryLevel, wetPan, wetLevel })
@@ -290,7 +288,7 @@ void SignalDiagram::paintDoubler (juce::Graphics& g, double msA, double msB)
     const auto caption = dashedBox.withY (dashedBox.getBottom() + 5.0f).withHeight (12.0f).expanded (40.0f, 0.0f);
     silkText (g, "DOUBLER  DRY AND " + juce::String (msA + msB, 1) + " ms", caption, 8.5f, juce::Justification::centred, colours::silkDim, false);
     if (state.human)
-        silkText (g, "HUMAN TIMING  " + juce::String (juce::CharPointer_UTF8 ("\xc2\xb1")) + juce::String (state.humanMs, 1) + " ms",
+        silkText (g, "HUMANIZED  " + juce::String (juce::CharPointer_UTF8 ("\xc2\xb1")) + juce::String (state.humanMs, 1) + " ms",
                   caption.translated (0.0f, 13.0f), 8.5f, juce::Justification::centred, colours::amberDim);
 }
 

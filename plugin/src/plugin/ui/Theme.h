@@ -78,7 +78,7 @@ namespace layout
     inline constexpr KnobSpot output { 878 + kX, 230, 50, "OUTPUT" }, temperature { 946 + kX, 230, 50, "ROOM" };
     inline constexpr KnobSpot dryPan { 152, 201, 38, "PAN" }, dryLevel { 152, 279, 38, "LEVEL" };
     inline constexpr KnobSpot wetPan { 222, 201, 38, "PAN" }, wetLevel { 222, 279, 38, "LEVEL" };
-    inline constexpr KnobSpot humanAmount { 241, 104, 30, "AMOUNT" };
+    inline constexpr KnobSpot humanAmount { 241, 106, 30, "AMOUNT" };
 
     inline juce::Rectangle<int> knobBounds (KnobSpot k)
     {
@@ -92,13 +92,12 @@ namespace layout
     inline juce::Rectangle<float> titleAbove (juce::Rectangle<int> r) { return r.translated (0, -18).withHeight (14).toFloat().expanded (6.0f, 0.0f); }
     inline juce::Rectangle<float> toggleTitle (int col, int row) { return titleAbove (toggle (col, row)); }
 
-    // Doubler plate, top to bottom: MODE switch, PERSONA switch with its AMOUNT knob, then the DRY and 30 MS columns.
-    inline const juce::Rectangle<int> modeSwitch { 114, 34, 146, 28 };
-    inline const juce::Rectangle<float> modeTitle { 120.0f, 17.0f, 80.0f, 14.0f };
-    inline constexpr int modeDivider = 68;
-    inline const juce::Rectangle<int> personaSwitch { 112, 90, 108, 28 };
-    inline const juce::Rectangle<float> personaTitle { 120.0f, 69.0f, 80.0f, 14.0f };
-    inline constexpr int personaDivider = 143;
+    // Doubler plate, top to bottom: DOUBLE button, HUMANIZE button with its AMOUNT knob, then the DRY and 30 MS columns.
+    inline const juce::Rectangle<int> doubleButton { 115, 20, 100, 42 };
+    inline constexpr int modeDivider = 70;
+    inline const juce::Rectangle<int> humanizeButton { 115, 85, 100, 42 };
+    inline const juce::Rectangle<float> humanAmountLabel { 196.0f, 77.0f, 90.0f, 12.0f };
+    inline constexpr int humanizeDivider = 143;
     inline const juce::Rectangle<float> dryHeader { 117.0f, 148.0f, 70.0f, 13.0f }, wetHeader { 187.0f, 148.0f, 70.0f, 13.0f };
 } // namespace layout
 } // namespace dfd::ui
