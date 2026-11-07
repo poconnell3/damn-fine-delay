@@ -9,7 +9,7 @@
 
 /** Rack-panel editor drawn at a fixed design size and scaled as a whole (fixed aspect ratio). */
 class RedRoomDelayEditor final : public juce::AudioProcessorEditor,
-                                  private juce::Timer
+                                 private juce::Timer
 {
 public:
     explicit RedRoomDelayEditor (RedRoomDelayProcessor&);

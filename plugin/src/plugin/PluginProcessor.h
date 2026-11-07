@@ -27,8 +27,8 @@ inline constexpr auto humanAmount = "humanAmount";
 } // namespace ParamIds
 
 class RedRoomDelayProcessor final : public juce::AudioProcessor,
-                                     private juce::AudioProcessorValueTreeState::Listener,
-                                     private juce::AsyncUpdater
+                                    private juce::AudioProcessorValueTreeState::Listener,
+                                    private juce::AsyncUpdater
 {
 public:
     static constexpr int kStateVersion = 1;
