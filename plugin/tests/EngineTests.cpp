@@ -420,52 +420,172 @@ void testDoubler()
            fmt ("mono output: dry %.3f, cascade peak %.3f", y[0], peak (y, tap - 40, tap + 40)));
 }
 
-/** Arrival time (ms, relative to 30 ms) of the cascade copy of clicks every 0.4 s, delay hard right. */
-std::vector<double> doublerArrivals (bool human, double humanMs, double seconds)
+/** A guitar-like note: a few harmonics, 1 ms attack, exponential decay. */
+double pluck (double t, double f, double tau)
 {
-    EngineParams p = linearParams (Color::B, Routing::Cascade);
-    p.doubler = true;
-    p.dryPan = -1.0;
-    p.wetPan = 1.0;
-    p.human = human;
-    p.humanMs = humanMs;
-    const double fs = 48000.0;
-    const int period = (int) (0.4 * fs);
-    Run r = run (fs, EngineSetup {}, p, [&] (int i) { return i % period == 0 ? 1.0 : 0.0; }, [] (int) { return 0.0; }, seconds);
-    std::vector<double> ms;
-    const double nominal = (Engine::kTauA + Engine::kTauB) * fs + r.latency;
-    for (int k = 1; (k + 1) * period < (int) r.right.size(); ++k)
-    {
-        // Parabolic peak over a +-15 ms window around the nominal arrival.
-        const int lo = k * period + (int) nominal - 720, hi = k * period + (int) nominal + 720;
-        int best = lo;
-        for (int i = lo; i < hi; ++i)
-            if (std::abs (r.right[(size_t) i]) > std::abs (r.right[(size_t) best]))
-                best = i;
-        const double a = r.right[(size_t) best - 1], b = r.right[(size_t) best], c = r.right[(size_t) best + 1];
-        const double frac = 0.5 * (a - c) / (a - 2.0 * b + c);
-        ms.push_back ((best + frac - k * period - nominal) / fs * 1000.0);
-    }
-    return ms;
+    if (t < 0.0)
+        return 0.0;
+    const double env = std::min (1.0, t / 0.001) * std::exp (-t / tau);
+    return 0.25 * env * (std::sin (kTwoPi * f * t) + 0.5 * std::sin (kTwoPi * 2.0 * f * t) + 0.25 * std::sin (kTwoPi * 3.0 * f * t));
 }
 
-void testHumanPersona()
+/** Lag (samples) that best aligns out[s + lag ..] with in[s ..] over n samples, searched around `nominal`. */
+double bestLag (const std::vector<double>& in, const std::vector<double>& out, size_t s, size_t n, double nominal, double range)
 {
-    std::puts ("humanize (random drift both ways within +-amount; off is exact)");
-    auto range = [] (const std::vector<double>& v)
+    auto corr = [&] (long lag)
     {
-        const auto [lo, hi] = std::minmax_element (v.begin(), v.end());
-        return std::pair { *lo, *hi };
+        double acc = 0.0, e1 = 0.0, e2 = 0.0;
+        for (size_t i = s; i < s + n; ++i)
+        {
+            const double a = in[i], b = out[(size_t) ((long) i + lag)];
+            acc += a * b;
+            e1 += a * a;
+            e2 += b * b;
+        }
+        return acc / std::sqrt (e1 * e2 + 1e-30);
     };
-    const auto robot = range (doublerArrivals (false, 5.0, 8.0));
-    check (std::abs (robot.first) < 0.05 && std::abs (robot.second) < 0.05,
-           fmt ("humanize off: arrivals %.3f..%.3f ms from 30 ms", robot.first, robot.second));
-    for (double amount : { 2.0, 5.0 })
+    long best = (long) (nominal - range);
+    double bestC = -2.0;
+    for (long lag = (long) (nominal - range); lag <= (long) (nominal + range); ++lag)
+        if (const double c = corr (lag); c > bestC)
+        {
+            bestC = c;
+            best = lag;
+        }
+    const double a = corr (best - 1), b = bestC, c = corr (best + 1);
+    return (double) best + 0.5 * (a - c) / (a - 2.0 * b + c);
+}
+
+void testHumanize()
+{
+    std::puts ("humanize (one random shift per note within +-amount, held for the whole note; off is exact)");
+    // Decaying noise bursts: broadband, so the alignment is unambiguous (a pitched tone would match every period).
+    // Spaced 1 s apart so successive shifts are mostly independent (closer notes are deliberately correlated).
+    const double fs = 48000.0, period = 1.0, amount = 5.0;
+    const int notes = 24;
+    const int n = (int) ((notes + 1) * period * fs);
+    std::vector<double> in ((size_t) n);
+    std::mt19937 rng (11);
+    std::normal_distribution<double> g (0.0, 0.15);
+    for (int i = 0; i < n; ++i)
     {
-        const auto h = range (doublerArrivals (true, amount, 24.0));
-        check (h.first > -amount - 0.3 && h.second < amount + 0.3, fmt ("humanize +-%.0f ms: arrivals %.2f..%.2f ms", amount, h.first, h.second));
-        check (h.first < -0.25 * amount && h.second > 0.25 * amount, fmt ("humanize +-%.0f ms: drifts both earlier (%.2f) and later (%.2f)", amount, h.first, h.second));
+        const double t = i / fs, local = t - (int) (t / period) * period;
+        in[(size_t) i] = g (rng) * std::min (1.0, local / 0.001) * std::exp (-local / 0.08);
     }
+    auto render = [&] (bool human)
+    {
+        EngineParams p = linearParams (Color::B, Routing::Cascade);
+        p.doubler = true;
+        p.dryPan = -1.0;
+        p.wetPan = 1.0;
+        p.human = human;
+        p.humanMs = amount;
+        return run (fs, EngineSetup {}, p, [&] (int i) { return in[(size_t) i]; }, [&] (int i) { return in[(size_t) i]; }, n / fs).right;
+    };
+    const auto robot = render (false), human = render (true);
+    const double nominal = 0.030 * fs + 31.0, range = 0.012 * fs;
+
+    std::vector<double> shifts;
+    double worstWithin = 0.0, worstRobot = 0.0;
+    for (int k = 1; k < notes; ++k)
+    {
+        const size_t start = (size_t) (k * period * fs);
+        const size_t early = start, late = start + (size_t) (0.06 * fs);
+        const size_t lenEarly = (size_t) (0.03 * fs), lenLate = (size_t) (0.06 * fs);
+        const double r1 = bestLag (in, robot, early, lenEarly, nominal, range), r2 = bestLag (in, robot, late, lenLate, nominal, range);
+        const double h1 = bestLag (in, human, early, lenEarly, nominal, range), h2 = bestLag (in, human, late, lenLate, nominal, range);
+        worstRobot = std::max (worstRobot, std::abs (r1 - r2) / fs * 1e3);
+        worstWithin = std::max (worstWithin, std::abs ((h1 - r1) - (h2 - r2)) / fs * 1e3);
+        shifts.push_back ((h1 - r1) / fs * 1e3);
+    }
+    const auto [lo, hi] = std::minmax_element (shifts.begin(), shifts.end());
+    double mean = 0.0, var = 0.0;
+    for (double x : shifts)
+        mean += x / (double) shifts.size();
+    for (double x : shifts)
+        var += (x - mean) * (x - mean) / (double) shifts.size();
+    check (worstWithin < 0.05, fmt ("shift is constant within each note (worst early/late difference %.3f ms)", worstWithin));
+    check (*lo >= -amount - 0.05 && *hi <= amount + 0.05, fmt ("shifts within +-%.0f ms: %.2f..%.2f ms", amount, *lo, *hi));
+    check (*lo < -0.25 * amount && *hi > 0.25 * amount && std::sqrt (var) > 0.5,
+           fmt ("shifts go both ways and vary note to note (%.2f..%.2f ms, spread %.2f ms)", *lo, *hi, std::sqrt (var)));
+    check (worstRobot < 0.05, fmt ("humanize off: timing identical early and late in each note (worst %.3f ms)", worstRobot));
+}
+
+void testHumanizerDetector()
+{
+    std::puts ("humanize note detection (picked notes, legato hammer-ons, slides)");
+    const double fs = 48000.0;
+    auto runHumanizer = [&] (const std::function<double (double)>& signal, double seconds, const std::vector<double>& probeTimes)
+    {
+        Humanizer h;
+        h.prepare (fs, 3);
+        std::vector<double> probes;
+        size_t next = 0;
+        for (int i = 0; i < (int) (seconds * fs); ++i)
+        {
+            h.process (signal (i / fs), true, 5.0);
+            if (next < probeTimes.size() && i / fs >= probeTimes[next])
+            {
+                probes.push_back (h.currentShiftMs());
+                ++next;
+            }
+        }
+        return std::pair { h.onsets(), probes };
+    };
+    auto meanStep = [] (const std::vector<double>& v)
+    {
+        double s = 0.0;
+        for (size_t i = 1; i < v.size(); ++i)
+            s += std::abs (v[i] - v[i - 1]) / (double) (v.size() - 1);
+        return s;
+    };
+
+    // Picked notes with gaps: one onset per note, and fresh shifts.
+    std::vector<double> picks;
+    for (int k = 0; k < 16; ++k)
+        picks.push_back (0.1 + k * 1.2 + 0.02);
+    const auto [pickOnsets, pickShifts] = runHumanizer ([] (double t)
+    {
+        const int k = (int) ((t - 0.1) / 1.2);
+        return t < 0.1 ? 0.0 : pluck (t - 0.1 - k * 1.2, 220.0 * std::pow (2.0, (k % 5) / 12.0), 0.25);
+    }, 0.1 + 16 * 1.2, picks);
+    check (pickOnsets == 16, fmt ("picked notes: %.0f onsets for 16 notes", pickOnsets));
+
+    // Legato: a ringing string, a new pitch every 150 ms with a hammer-on bump of +6 dB.
+    std::vector<double> legatoProbes;
+    for (int k = 0; k < 40; ++k)
+        legatoProbes.push_back (0.1 + k * 0.15 + 0.02);
+    double phase = 0.0;
+    double lastT = 0.0;
+    const auto [legatoOnsets, legatoShifts] = runHumanizer ([&] (double t)
+    {
+        if (t < 0.1)
+            return 0.0;
+        const int k = (int) ((t - 0.1) / 0.15);
+        const double local = t - 0.1 - k * 0.15;
+        const double f = 196.0 * std::pow (2.0, (k % 5) / 12.0);
+        phase += kTwoPi * f * (t - lastT);
+        lastT = t;
+        const double env = 0.12 * (1.0 + std::exp (-local / 0.03)) * std::min (1.0, (t - 0.1) / 0.001);
+        return env * (std::sin (phase) + 0.5 * std::sin (2.0 * phase) + 0.3 * std::sin (3.0 * phase));
+    }, 0.1 + 40 * 0.15, legatoProbes);
+    check (std::abs (legatoOnsets - 40) <= 1, fmt ("legato hammer-ons: %.0f onsets for 40 notes", legatoOnsets));
+    check (meanStep (legatoShifts) < 0.6 * meanStep (pickShifts),
+           fmt ("legato runs move by smaller steps (%.2f ms) than separate phrases (%.2f ms)", meanStep (legatoShifts), meanStep (pickShifts)));
+
+    // A slide: continuous pitch glide at constant level, no new attack.
+    phase = 0.0;
+    lastT = 0.0;
+    const auto [slideOnsets, unused] = runHumanizer ([&] (double t)
+    {
+        if (t < 0.1)
+            return 0.0;
+        const double f = 196.0 * std::pow (2.0, std::min (1.0, (t - 0.3) / 0.6) * std::max (0.0, 1.0) * (t > 0.3 ? 5.0 / 12.0 : 0.0));
+        phase += kTwoPi * f * (t - lastT);
+        lastT = t;
+        return 0.2 * std::min (1.0, (t - 0.1) / 0.001) * (std::sin (phase) + 0.5 * std::sin (2.0 * phase));
+    }, 1.5, {});
+    check (slideOnsets == 1, fmt ("slide: %.0f onset (the first attack only)", slideOnsets));
 }
 
 void testStress()
@@ -519,7 +639,8 @@ int main (int argc, char** argv)
     testNoiseAndCrosstalk();
     testBypass();
     testDoubler();
-    testHumanPersona();
+    testHumanize();
+    testHumanizerDetector();
     testStress();
     std::printf ("%d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

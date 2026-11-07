@@ -288,7 +288,7 @@ void SignalDiagram::paintDoubler (juce::Graphics& g, double msA, double msB)
     const auto caption = dashedBox.withY (dashedBox.getBottom() + 5.0f).withHeight (12.0f).expanded (40.0f, 0.0f);
     silkText (g, "DOUBLER  DRY AND " + juce::String (msA + msB, 1) + " ms", caption, 8.5f, juce::Justification::centred, colours::silkDim, false);
     if (state.human)
-        silkText (g, "HUMANIZED  " + juce::String (juce::CharPointer_UTF8 ("\xc2\xb1")) + juce::String (state.humanMs, 1) + " ms",
+        silkText (g, "PER-NOTE TIMING  " + juce::String (juce::CharPointer_UTF8 ("\xc2\xb1")) + juce::String (state.humanMs, 1) + " ms",
                   caption.translated (0.0f, 13.0f), 8.5f, juce::Justification::centred, colours::amberDim);
 }
 

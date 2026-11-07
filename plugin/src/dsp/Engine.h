@@ -3,6 +3,7 @@
 #include <array>
 #include <vector>
 
+#include "Humanizer.h"
 #include "Line.h"
 #include "Oversampler.h"
 
@@ -37,8 +38,8 @@ struct EngineParams
     double dryPan = -0.6, wetPan = 0.6;
     double dryLevelDb = 0.0, wetLevelDb = 0.0;
 
-    /** Humanize (doubler only): the 30 ms copy drifts slowly and randomly earlier and later,
-        by up to +-humanMs, like a second take played by hand. Off keeps it exact. */
+    /** Humanize (doubler only): each new note of the 30 ms copy lands at its own random time within
+        +-humanMs, held for the whole note, like a second take played by hand. Off keeps it exact. */
     bool human = false;
     double humanMs = 3.0;
 
@@ -93,22 +94,18 @@ private:
     bool wetCleared = false;
     Cascade leakAtoB, leakBtoA;
     Smoothed drive, mix, levelA, levelB, output;
-    Smoothed doublerAmount, dryPan, wetPan, dryLevel, wetLevel, humanAmount;
+    Smoothed doublerAmount, dryPan, wetPan, dryLevel, wetLevel;
 
-    /** Smooth random timing drift in [-1, 1]: a critically damped glide toward random targets at random intervals. */
-    struct Drift
-    {
-        double value = 0.0, velocity = 0.0, target = 0.0;
-        int countdown = 0;
-        uint64_t rng = 1;
-        double uniform() noexcept; // [0, 1)
-    } drift;
-    double driftSeconds = 0.0;
+    // Doubler: the cascade input runs through the humanizer's pre-delay, which the tubes give back
+    // (retimed). Changing that is done under a short mute of the wet signal so the tubes can jump.
+    Humanizer humanizer;
+    bool retimed = false;
+    double wetDuck = 1.0, duckStep = 0.01;
     bool monoOutput = false;
     std::array<double, 4> bufA {}, bufB {};
 
     void applyRoutingDelays (bool immediate) noexcept;
-    void advanceDrift() noexcept;
+    void advanceRetime() noexcept;
     void clearWet() noexcept;
     double pushDry (double inL, double inR, double& dryR) noexcept;
 };

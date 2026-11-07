@@ -35,6 +35,9 @@ void Engine::prepare (double sampleRate, const EngineSetup& setup, const EngineP
     LineSetup b { kTauB, setup.temperatureC, setup.trimB, setup.echo, setup.seed + 1, &generated::kWallLossB };
     lineA.prepare (fsOs, a, initial.color);
     lineB.prepare (fsOs, b, initial.color);
+    humanizer.prepare (fs, setup.seed + 2);
+    retimed = initial.doubler && initial.routing == Routing::Cascade;
+    wetDuck = 1.0;
     applyRoutingDelays (true);
 
     // Crosstalk (feed B, read A): -45 dB at 1 kHz rising 20 dB/decade, from undelayed electrical coupling.
@@ -61,11 +64,7 @@ void Engine::prepare (double sampleRate, const EngineSetup& setup, const EngineP
     wetPan.snap (initial.wetPan);
     dryLevel.snap (dbToGain (initial.dryLevelDb));
     wetLevel.snap (dbToGain (initial.wetLevelDb));
-    humanAmount.coeff = 1.0 - std::exp (-1.0 / (0.3 * fs)); // slow, so turning the knob doesn't bend pitch
-    humanAmount.snap (initial.doubler && initial.human ? initial.humanMs * 1e-3 : 0.0);
-    drift = {};
-    drift.rng = 0x2545F4914F6CDD1Dull ^ (setup.seed * 0x9E3779B97F4A7C15ull);
-    driftSeconds = 0.0;
+    duckStep = 1.0 / (0.005 * fs);
     reset();
 }
 
@@ -77,6 +76,7 @@ void Engine::clearWet() noexcept
         o->reset();
     leakAtoB.reset();
     leakBtoA.reset();
+    humanizer.reset();
 }
 
 void Engine::reset()
@@ -90,45 +90,30 @@ void Engine::reset()
 
 void Engine::applyRoutingDelays (bool immediate) noexcept
 {
-    // In Cascade the drift is split across both lines, so neither line's delay gets close to zero.
+    // Retimed (doubler): the humanizer's base pre-delay is taken back out of the tubes, half from each,
+    // so the net cascade delay stays 30 ms plus the note's shift.
     const bool cascade = params.routing == Routing::Cascade;
-    const double half = cascade ? 0.5 * driftSeconds : 0.0;
-    lineA.setExtraDelay (extraSeconds + half, immediate);
-    lineB.setExtraDelay (cascade ? half : extraSeconds, immediate);
+    const double half = cascade && retimed ? 0.5 * humanizer.baseDelaySamples() / fs : 0.0;
+    lineA.setExtraDelay (extraSeconds - half, immediate);
+    lineB.setExtraDelay (cascade ? -half : extraSeconds, immediate);
 }
 
-double Engine::Drift::uniform() noexcept
+void Engine::advanceRetime() noexcept
 {
-    rng ^= rng << 13;
-    rng ^= rng >> 7;
-    rng ^= rng << 17;
-    return (double) (rng >> 11) * (1.0 / 9007199254740992.0);
-}
-
-void Engine::advanceDrift() noexcept
-{
-    const double amount = humanAmount.next();
-    if (amount < 1e-9 && std::abs (driftSeconds) < 1e-9)
+    const bool wanted = params.doubler && params.routing == Routing::Cascade;
+    if (wanted != retimed)
     {
-        if (driftSeconds != 0.0)
+        wetDuck -= duckStep;
+        if (wetDuck <= 0.0)
         {
-            driftSeconds = 0.0;
-            applyRoutingDelays (false);
+            wetDuck = 0.0;
+            retimed = wanted;
+            humanizer.reset();
+            applyRoutingDelays (true);
         }
-        return;
     }
-    // New target every 0.6-1.6 s; the glide (omega 2.5 rad/s) keeps the pitch bend within about 0.2 % per ms of amount.
-    if (--drift.countdown <= 0)
-    {
-        drift.target = 2.0 * drift.uniform() - 1.0;
-        drift.countdown = (int) ((0.6 + drift.uniform()) * fs);
-    }
-    constexpr double omega = 2.5;
-    const double dt = 1.0 / fs;
-    drift.velocity += dt * (omega * omega * (drift.target - drift.value) - 2.0 * omega * drift.velocity);
-    drift.value = std::clamp (drift.value + dt * drift.velocity, -1.0, 1.0);
-    driftSeconds = amount * drift.value;
-    applyRoutingDelays (false);
+    else if (wetDuck < 1.0)
+        wetDuck = std::min (1.0, wetDuck + duckStep);
 }
 
 void Engine::setParams (const EngineParams& p) noexcept
@@ -151,18 +136,20 @@ void Engine::setParams (const EngineParams& p) noexcept
     wetPan.set (p.wetPan);
     dryLevel.set (dbToGain (p.dryLevelDb));
     wetLevel.set (dbToGain (p.wetLevelDb));
-    humanAmount.set (p.doubler && p.human ? std::clamp (p.humanMs, 0.0, 10.0) * 1e-3 : 0.0);
 }
 
 void Engine::processSample (double inL, double inR, double& outL, double& outR) noexcept
 {
     const LineSwitches sw { params.nonlinear, params.noise };
     const double g = drive.next();
-    advanceDrift();
+    advanceRetime();
 
     double inA = inL, inB = inR;
     if (params.routing != Routing::Dual)
         inA = inB = 0.5 * (inL + inR);
+    const double timed = humanizer.process (0.5 * (inL + inR), retimed && params.human, params.humanMs);
+    if (retimed)
+        inA = timed;
 
     std::array<double, 4> osA {}, osB {};
     upA.up (inA, osA.data());
@@ -183,6 +170,8 @@ void Engine::processSample (double inL, double inR, double& outL, double& outR) 
         outL = downA.down (bufA.data());
         outR = downB.down (bufB.data());
     }
+    outL *= wetDuck;
+    outR *= wetDuck;
 
     // Dry path, delayed to match the wet path's oversampling latency.
     double dryR;
