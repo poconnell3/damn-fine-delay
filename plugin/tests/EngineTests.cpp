@@ -1,4 +1,4 @@
-// Spec tests for the real-time engine (doc 03 section 7). Run: ./dfd_tests
+// Spec tests for the real-time engine (doc 03 section 7). Run: ./rrd_tests
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -9,7 +9,7 @@
 
 #include "Engine.h"
 
-using namespace dfd;
+using namespace rrd;
 
 namespace
 {

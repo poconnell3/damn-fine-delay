@@ -1,4 +1,4 @@
-"""Damn Fine Delay - offline golden-reference engine (Python prototype of the 920-16 signal path).
+"""Red Room Delay - offline golden-reference engine (Python prototype of the 920-16 signal path).
 
 Per line, at the oversampled rate:
     drive -> input transformer -> SEND EQ -> output RC -> driver excursion limit
@@ -262,7 +262,7 @@ class Line:
         return y / g
 
 
-class DamnFineDelay:
+class RedRoomDelay:
     """Two lines (A = 16 ms, B = 14 ms) with routings. All I/O at the base rate `fs`."""
 
     def __init__(self, fs: float = 48000.0, settings: Settings = Settings(), oversample: int = 2):

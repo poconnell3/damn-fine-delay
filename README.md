@@ -1,10 +1,10 @@
-# Damn Fine Delay
+# Red Room Delay
 
 A physical model of the 1971 two-line acoustic tube delay: 16 ms and 14 ms lines of coiled tubing, driven and picked up by dynamic capsules, with heavy pre- and post-EQ, and a 30 ms cascade. It is inspired by the original hardware and does not use its trademarks.
 
 | Folder | What it is |
 |---|---|
-| [`plugin/`](plugin/) | Real-time C++20 engine and JUCE 8 plug-in (VST3, CLAP, Standalone; AU on macOS). v0.6. |
+| [`plugin/`](plugin/) | Real-time C++20 engine and JUCE 8 plug-in (VST3, CLAP, Standalone; AU on macOS). v0.7. |
 | [`research/`](research/) | Research notes (hardware, physics, service manual, DSP design, sources), start at [`research/00-index.md`](research/00-index.md). |
 | [`research/prototype/`](research/prototype/) | Offline Python golden reference that the plug-in is null-tested against. |
 | [`research/tools/`](research/tools/) | Physics model of the tube and the schematic EQ networks. |
@@ -22,12 +22,12 @@ Reference checks (Python 3 with numpy, scipy, pytest; matplotlib and soundfile f
 
 ```
 cd research/prototype && PYTHONPATH=../tools python3 -m pytest -q test_engine.py
-cd plugin && PYTHONPATH=../research/prototype:../research/tools python3 tests/null_test.py build/dfd_cli
+cd plugin && PYTHONPATH=../research/prototype:../research/tools python3 tests/null_test.py build/rrd_cli
 ```
 
-![v0.6 editor, normal mode](plugin/docs/ui-v0.6-normal.png)
+![v0.7 editor, normal mode](plugin/docs/ui-v0.7-normal.png)
 
-![v0.6 editor, double mode with Humanize on](plugin/docs/ui-v0.6-double.png)
+![v0.7 editor, double mode with Humanize on](plugin/docs/ui-v0.7-double.png)
 
 ## Licence
 

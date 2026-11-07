@@ -4,7 +4,7 @@
 
 #include "Theme.h"
 
-namespace dfd::ui
+namespace rrd::ui
 {
 /** Knurled black knobs with silkscreen ticks, dark menus and small value readouts. */
 class RackLook final : public juce::LookAndFeel_V4
@@ -96,4 +96,4 @@ public:
 private:
     bool lit = false;
 };
-} // namespace dfd::ui
+} // namespace rrd::ui

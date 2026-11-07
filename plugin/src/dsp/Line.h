@@ -6,7 +6,7 @@
 #include "Filters.h"
 #include "GeneratedFilters.h"
 
-namespace dfd
+namespace rrd
 {
 enum class Color { A, B };
 enum class NoiseMode { Off, Authentic, Extra };
@@ -104,4 +104,4 @@ private:
     void setTapTargets (Color c, bool immediate) noexcept;
 };
 
-} // namespace dfd
+} // namespace rrd

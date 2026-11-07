@@ -173,7 +173,7 @@ def main() -> None:
         "#include <array>",
         "#include <vector>",
         "",
-        "namespace dfd::generated",
+        "namespace rrd::generated",
         "{",
         "/** Polynomial coefficients, highest power first, in p = s / (2*pi*1000). */",
         "struct Rational",
@@ -199,7 +199,7 @@ def main() -> None:
     ]
     for name, (zeros, poles, g1k) in tubes.items():
         parts.append(f"inline constexpr WallLossFit kWallLoss{name} {{ {emit_array(zeros)}, {emit_array(poles)}, {g1k:.17g} }};")
-    parts += ["", "} // namespace dfd::generated", ""]
+    parts += ["", "} // namespace rrd::generated", ""]
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text("\n".join(parts))
     print(f"wrote {OUT.relative_to(ROOT)}")

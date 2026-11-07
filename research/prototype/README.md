@@ -1,4 +1,4 @@
-# Damn Fine Delay: Python prototype (golden reference)
+# Red Room Delay: Python prototype (golden reference)
 
 Offline engine for the 920-16 signal path. It is the reference the C++ plugin gets null-tested against, and it renders the listening demos.
 
@@ -18,7 +18,7 @@ Needs numpy, scipy, soundfile, matplotlib, pytest. ffmpeg is optional (MP3s).
 | File | What it does |
 |---|---|
 | `analog.py` | Exact analog transfer functions of the SEND, output RC and RECEIVE networks (schematic D11688) as rational functions, realized as FIRs on an FFT grid with an 8th-order 24 kHz guard low-pass. Error ≤ 0.007 dB from 20 Hz to 16 kHz. |
-| `engine.py` | `DamnFineDelay` (lines A and B, routings) and `Line` (one tube path). |
+| `engine.py` | `RedRoomDelay` (lines A and B, routings) and `Line` (one tube path). |
 | `signals.py` | Synthesized test program: Karplus-Strong guitar, formant voice, drum loop. |
 | `render.py` | Demo renders, response plots, metrics. |
 | `test_engine.py` | Spec tests from doc 03 §7. |

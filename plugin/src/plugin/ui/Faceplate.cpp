@@ -1,6 +1,6 @@
 #include "Faceplate.h"
 
-namespace dfd::ui
+namespace rrd::ui
 {
 namespace
 {
@@ -124,9 +124,9 @@ void Faceplate::paintStatic (juce::Graphics& g)
 
     // Left plate: title, maker and captive screws, as on the original's front panel.
     const auto lp = leftPlate.toFloat();
-    silkText (g, "DAMN FINE DELAY", lp.withY (lp.getY() + 12.0f).withHeight (22.0f), 18.0f);
+    silkText (g, "RED ROOM DELAY", lp.withY (lp.getY() + 12.0f).withHeight (22.0f), 18.0f);
     silkText (g, "MODEL 1416", lp.withY (lp.getY() + 34.0f).withHeight (14.0f), 10.5f);
-    silkText (g, "DAMN FINE AUDIO", lp.withY (lp.getBottom() - 30.0f).withHeight (18.0f), 13.0f);
+    silkText (g, "FIREWALK AUDIO", lp.withY (lp.getBottom() - 30.0f).withHeight (18.0f), 13.0f);
     thumbScrew (g, { lp.getX() + 13.0f, lp.getCentreY() });
     thumbScrew (g, { lp.getRight() - 13.0f, lp.getCentreY() });
 
@@ -372,4 +372,4 @@ void SignalDiagram::paint (juce::Graphics& g)
     silkText (g, caption, box.withY (box.getBottom() + 5.0f).withHeight (12.0f).expanded (30.0f, 0.0f), 8.5f,
               juce::Justification::centred, colours::silkDim, false);
 }
-} // namespace dfd::ui
+} // namespace rrd::ui

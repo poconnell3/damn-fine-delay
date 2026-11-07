@@ -1,4 +1,4 @@
-"""Spec tests for the Damn Fine Delay golden-reference engine (doc 03 section 7)."""
+"""Spec tests for the Red Room Delay golden-reference engine (doc 03 section 7)."""
 from __future__ import annotations
 
 from dataclasses import replace
@@ -8,7 +8,7 @@ import pytest
 
 import ctc_eq_networks as ref_eq
 from analog import analog_fir, receive_network, send_network, send_output_rc
-from engine import (A_NOMINAL, NOISE_BW_HZ, NOMINAL_DBFS, TAU_A, TAU_B, DamnFineDelay, Settings,
+from engine import (A_NOMINAL, NOISE_BW_HZ, NOMINAL_DBFS, TAU_A, TAU_B, RedRoomDelay, Settings,
                     Trim, db, digital_delay, group_delay_1k)
 from ctc_reference_model import Tube
 
@@ -50,13 +50,13 @@ def thd_pct(h: np.ndarray) -> float:
 
 
 @pytest.fixture(scope="module")
-def linear_b() -> DamnFineDelay:
-    return DamnFineDelay(FS, Settings(color="B").linear())
+def linear_b() -> RedRoomDelay:
+    return RedRoomDelay(FS, Settings(color="B").linear())
 
 
 @pytest.fixture(scope="module")
-def linear_a() -> DamnFineDelay:
-    return DamnFineDelay(FS, Settings(color="A").linear())
+def linear_a() -> RedRoomDelay:
+    return RedRoomDelay(FS, Settings(color="A").linear())
 
 
 @pytest.mark.parametrize("fs_os", [88200, 96000, 192000])
@@ -74,15 +74,15 @@ def test_eq_networks_match_reference(fs_os: int) -> None:
 
 @pytest.mark.parametrize("fs", [44100, 48000, 88200, 96000])
 def test_delay_accuracy(fs: int) -> None:
-    eng = DamnFineDelay(fs, replace(Settings(color="B").linear(), echo=False))
+    eng = RedRoomDelay(fs, replace(Settings(color="B").linear(), echo=False))
     for line, tau in (("a", TAU_A), ("b", TAU_B)):
         y = getattr(eng, f"wet_{line}")(impulse(1.0, fs))
         assert abs(group_delay_1k(y, fs) - PRE - tau) * fs < 0.05
 
 
 def test_echo_position_and_level() -> None:
-    on = DamnFineDelay(FS, Settings(color="B").linear())
-    off = DamnFineDelay(FS, replace(Settings(color="B").linear(), echo=False))
+    on = RedRoomDelay(FS, Settings(color="B").linear())
+    off = RedRoomDelay(FS, replace(Settings(color="B").linear(), echo=False))
     for line, tau in (("a", TAU_A), ("b", TAU_B)):
         direct = getattr(off, f"wet_{line}")(impulse())
         echo = getattr(on, f"wet_{line}")(impulse()) - direct
@@ -97,7 +97,7 @@ def test_echo_position_and_level() -> None:
             assert abs(measured - model) < 2.0
 
 
-def test_ripple_spacing(linear_b: DamnFineDelay) -> None:
+def test_ripple_spacing(linear_b: RedRoomDelay) -> None:
     for line, tau in (("a", TAU_A), ("b", TAU_B)):
         y = getattr(linear_b, f"wet_{line}")(impulse(1.0))
         f, h = spectrum(y)
@@ -115,8 +115,8 @@ def test_ripple_spacing(linear_b: DamnFineDelay) -> None:
 def test_cascade_beat_null() -> None:
     """The two first echoes (58 and 62 ms) beat; the null sits near 1/(2*4 ms) = 125 Hz, pulled to ~120 Hz
     by the extra wall-loss phase of the longer A tube."""
-    on = DamnFineDelay(FS, Settings(color="B").linear())
-    off = DamnFineDelay(FS, replace(Settings(color="B").linear(), echo=False))
+    on = RedRoomDelay(FS, Settings(color="B").linear())
+    off = RedRoomDelay(FS, replace(Settings(color="B").linear(), echo=False))
     echo = on.cascade(impulse(1.0)) - off.cascade(impulse(1.0))
     f, e = spectrum(echo)
     sel = (f > 80.0) & (f < 200.0)
@@ -131,7 +131,7 @@ def test_cascade_beat_null() -> None:
     assert abs(measured - expected) < 2.0
 
 
-def test_color_b_frequency_response(linear_b: DamnFineDelay) -> None:
+def test_color_b_frequency_response(linear_b: RedRoomDelay) -> None:
     for line in ("a", "b"):
         f, h = spectrum(getattr(linear_b, f"wet_{line}")(impulse(1.0)))
         m = rel_db(f, h)
@@ -142,7 +142,7 @@ def test_color_b_frequency_response(linear_b: DamnFineDelay) -> None:
         assert np.interp(15000.0, f, m) < -20.0
 
 
-def test_color_a_within_factory_tolerance(linear_a: DamnFineDelay) -> None:
+def test_color_a_within_factory_tolerance(linear_a: RedRoomDelay) -> None:
     f, h = spectrum(linear_a.wet_a(impulse(1.0)))
     m = rel_db(f, h)
     band = (f >= 40.0) & (f <= 10000.0)
@@ -151,27 +151,27 @@ def test_color_a_within_factory_tolerance(linear_a: DamnFineDelay) -> None:
 
 
 def test_trims_change_tone() -> None:
-    bright = DamnFineDelay(FS, replace(Settings(color="B").linear(), trim_a=Trim(hf_ohm=200.0)))
+    bright = RedRoomDelay(FS, replace(Settings(color="B").linear(), trim_a=Trim(hf_ohm=200.0)))
     f, h = spectrum(bright.wet_a(impulse(1.0)))
     assert np.interp(10000.0, f, rel_db(f, h)) > 1.0
 
 
 def test_thd_at_nominal() -> None:
-    eng = DamnFineDelay(FS, Settings(noise="off", crosstalk=False))
+    eng = RedRoomDelay(FS, Settings(noise="off", crosstalk=False))
     assert thd_pct(harmonics(eng.wet_a(tone(1000.0, 4.0)), 1000.0)) <= 0.5
     for fq in (100.0, 2000.0, 5000.0, 8000.0):
         assert thd_pct(harmonics(eng.wet_a(tone(fq, 4.0)), fq)) < 1.0
 
 
 def test_distortion_rises_with_level() -> None:
-    eng = DamnFineDelay(FS, Settings(noise="off", crosstalk=False))
+    eng = RedRoomDelay(FS, Settings(noise="off", crosstalk=False))
     low = thd_pct(harmonics(eng.wet_a(tone(100.0, 4.0)), 100.0))
     hot = thd_pct(harmonics(eng.wet_a(tone(100.0, 16.0)), 100.0))
     assert low < 0.1 < 3.0 < hot
 
 
 def test_noise_floor() -> None:
-    eng = DamnFineDelay(FS, Settings(crosstalk=False))
+    eng = RedRoomDelay(FS, Settings(crosstalk=False))
     y = eng.wet_a(np.zeros(3 * FS))[FS:]
     f, h = spectrum(y)
     band = f <= NOISE_BW_HZ
@@ -181,7 +181,7 @@ def test_noise_floor() -> None:
 
 
 def test_crosstalk() -> None:
-    eng = DamnFineDelay(FS, replace(Settings(color="B").linear(), crosstalk=True))
+    eng = RedRoomDelay(FS, replace(Settings(color="B").linear(), crosstalk=True))
     for fq, spec in ((1000.0, -45.0), (10000.0, -25.0)):
         x = tone(fq, 4.0)
         leak_a, _ = eng.dual(np.zeros_like(x), x)
@@ -190,7 +190,7 @@ def test_crosstalk() -> None:
 
 
 def test_routings_and_digital_reference() -> None:
-    eng = DamnFineDelay(FS, Settings(color="B").linear())
+    eng = RedRoomDelay(FS, Settings(color="B").linear())
     x = impulse()
     wide = eng.widener(x)
     assert wide.shape == (len(x), 2)
@@ -204,7 +204,7 @@ def test_routings_and_digital_reference() -> None:
 
 
 def test_hot_input_stays_finite() -> None:
-    eng = DamnFineDelay(FS, Settings(drive_db=20.0, noise="extra"))
+    eng = RedRoomDelay(FS, Settings(drive_db=20.0, noise="extra"))
     rng = np.random.default_rng(0)
     y = eng.widener(np.clip(rng.standard_normal(FS), -1.0, 1.0))
     assert np.all(np.isfinite(y))

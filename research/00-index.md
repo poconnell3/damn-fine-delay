@@ -1,6 +1,6 @@
-# Damn Fine Delay: Research Index
+# Red Room Delay: Research Index
 
-Research base for **Damn Fine Delay**, a VST/AU plugin that emulates the UREI / Universal Audio Model 920-16 Cooper Time Cube (1971), a dual acoustic delay line that sends audio down coiled plastic tubing. Name decided 2026-11-06; see doc 04 §5.
+Research base for **Red Room Delay** by Firewalk Audio, a VST/AU plugin that emulates the UREI / Universal Audio Model 920-16 Cooper Time Cube (1971), a dual acoustic delay line that sends audio down coiled plastic tubing. Name decided 2026-11-06; see doc 04 §5.
 
 ## Documents
 

@@ -1,5 +1,5 @@
 // Renders the editor to a PNG after feeding it test audio, so the panel can be checked without a host.
-// Usage: dfd_ui_snapshot out.png [scale] [routing 0-2] [numIn 1-2] [numOut 1-2] [doubler 0-1] [humanize 0-1]
+// Usage: rrd_ui_snapshot out.png [scale] [routing 0-2] [numIn 1-2] [numOut 1-2] [doubler 0-1] [humanize 0-1]
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 

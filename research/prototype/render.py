@@ -19,7 +19,7 @@ import numpy as np
 import soundfile as sf
 
 import signals
-from engine import TAU_A, TAU_B, DamnFineDelay, Settings, db, digital_delay
+from engine import TAU_A, TAU_B, RedRoomDelay, Settings, db, digital_delay
 
 FS = signals.FS
 TAIL_S = 0.25
@@ -28,11 +28,11 @@ INK, INK_2, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 
 VARIANTS = {
     "dry": "Dry source",
-    "cube_doubler": "Damn Fine Delay doubler: dry + line A (16 ms) at -3 dB",
+    "cube_doubler": "Red Room Delay doubler: dry + line A (16 ms) at -3 dB",
     "digital_doubler": "Plain digital doubler: dry + clean 16 ms delay at -3 dB",
-    "cube_widener": "Damn Fine Delay widener: L = line A (16 ms), R = line B (14 ms), wet only",
+    "cube_widener": "Red Room Delay widener: L = line A (16 ms), R = line B (14 ms), wet only",
     "digital_widener": "Plain digital widener: L = clean 16 ms, R = clean 14 ms",
-    "cube_cascade": "Damn Fine Delay cascade A into B (30 ms), wet only",
+    "cube_cascade": "Red Room Delay cascade A into B (30 ms), wet only",
     "cube_widener_hot": "Widener with Drive +14 dB (output trimmed back): driver, air and transformer grit",
 }
 
@@ -41,7 +41,7 @@ def stereo(x: np.ndarray) -> np.ndarray:
     return np.stack([x, x], axis=1) if x.ndim == 1 else x
 
 
-def render_variants(x: np.ndarray, cube: DamnFineDelay, hot: DamnFineDelay) -> dict[str, np.ndarray]:
+def render_variants(x: np.ndarray, cube: RedRoomDelay, hot: RedRoomDelay) -> dict[str, np.ndarray]:
     x = np.concatenate([x, np.zeros(int(TAIL_S * FS))])
     half = 10.0 ** (-3.0 / 20.0)
     return {
@@ -87,7 +87,7 @@ def plot_responses(path: Path) -> None:
     x, start = impulse()
     fig, axes = plt.subplots(2, 1, figsize=(9, 7.5), constrained_layout=True)
     for ax, color, title in ((axes[0], "B", "Color B (leveled)"), (axes[1], "A", "Color A (original, with unit residuals)")):
-        eng = DamnFineDelay(FS, Settings(color=color).linear())
+        eng = RedRoomDelay(FS, Settings(color=color).linear())
         for (label, y), c in zip((("Line A, 16 ms", eng.wet_a(x)), ("Line B, 14 ms", eng.wet_b(x)),
                                   ("Cascade, 30 ms", eng.cascade(x))), SERIES):
             f = np.fft.rfftfreq(len(y), 1.0 / FS)
@@ -102,14 +102,14 @@ def plot_responses(path: Path) -> None:
         _style(ax)
         ax.legend(frameon=False, fontsize=9, loc="lower left", labelcolor=INK_2)
     axes[1].set_xlabel("Frequency (Hz)")
-    fig.suptitle("Damn Fine Delay: frequency response (comb ripple is the 3τ echo)", color=INK, fontsize=12, x=0.01, ha="left")
+    fig.suptitle("Red Room Delay: frequency response (comb ripple is the 3τ echo)", color=INK, fontsize=12, x=0.01, ha="left")
     fig.savefig(path, dpi=150)
     plt.close(fig)
 
 
 def plot_impulse(path: Path) -> None:
     x, start = impulse(0.12)
-    eng = DamnFineDelay(FS, Settings(color="A").linear())
+    eng = RedRoomDelay(FS, Settings(color="A").linear())
     fig, ax = plt.subplots(figsize=(9, 3.8), constrained_layout=True)
     t = (np.arange(len(x)) - start) / FS * 1e3
     for (label, y), c in zip((("Line A", eng.wet_a(x)), ("Line B", eng.wet_b(x))), SERIES):
@@ -132,7 +132,7 @@ def metrics() -> dict:
     import test_engine as t
 
     out: dict = {}
-    lin = DamnFineDelay(FS, Settings(color="B").linear())
+    lin = RedRoomDelay(FS, Settings(color="B").linear())
     x, start = impulse()
     for line in ("a", "b"):
         f, h = t.spectrum(getattr(lin, f"wet_{line}")(x))
@@ -140,12 +140,12 @@ def metrics() -> dict:
         band = (f >= 40) & (f <= 10000)
         out[f"color_b_{line}_span_db"] = [round(float(m[band].min()), 2), round(float(m[band].max()), 2)]
         out[f"color_b_{line}_db_at"] = {str(q): round(float(np.interp(q, f, m)), 1) for q in (20, 11000, 12000, 15000)}
-    eng = DamnFineDelay(FS, Settings(noise="off", crosstalk=False))
+    eng = RedRoomDelay(FS, Settings(noise="off", crosstalk=False))
     out["thd_pct_at_+4dBu"] = {str(int(q)): round(t.thd_pct(t.harmonics(eng.wet_a(t.tone(q, 4.0)), q)), 3)
                                for q in (100.0, 1000.0, 3000.0, 5000.0, 8000.0)}
     out["thd_pct_100Hz_by_level_dBu"] = {str(l): round(t.thd_pct(t.harmonics(eng.wet_a(t.tone(100.0, l)), 100.0)), 2)
                                          for l in (4, 10, 13, 16)}
-    noisy = DamnFineDelay(FS, Settings(crosstalk=False))
+    noisy = RedRoomDelay(FS, Settings(crosstalk=False))
     y = noisy.wet_a(np.zeros(3 * FS))[FS:]
     f, h = t.spectrum(y)
     rms = np.sqrt(np.sum(np.abs(h[f <= 15700]) ** 2) * 2.0) / len(y)
@@ -159,8 +159,8 @@ def main(out_dir: str = "out") -> None:
         shutil.rmtree(out)
     (out / "audio").mkdir(parents=True)
     mp3 = shutil.which("ffmpeg") is not None
-    cube = DamnFineDelay(FS, Settings())
-    hot = DamnFineDelay(FS, replace(Settings(), drive_db=14.0))
+    cube = RedRoomDelay(FS, Settings())
+    hot = RedRoomDelay(FS, replace(Settings(), drive_db=14.0))
     for name, fn in signals.ALL.items():
         renders = render_variants(fn(), cube, hot)
         # One gain per source keeps the level differences between variants honest.

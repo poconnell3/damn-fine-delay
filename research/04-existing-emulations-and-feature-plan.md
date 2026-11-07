@@ -88,16 +88,17 @@ UA says it is an "exacting emulation" and a "feature-enhanced improvement" on th
 
 "Cooper Time Cube" is a UA trademark; UA's marketing writes it as Cooper® Time Cube. The plugin needs its own name, and should mention the original only descriptively ("inspired by the 1971 acoustic tube delay"). Hardware and patent facts can be cited freely. Don't copy UA or AudioThing UI artwork or presets, and don't fit our curves to their plugin outputs.
 
-### Decision: product name is **Damn Fine Delay** (2026-11-06)
+### Decision: product name is **Red Room Delay** by **Firewalk Audio** (2026-11-06)
 
-- **Why:** it nods to Agent Dale Cooper's "damn fine cup of coffee" line in *Twin Peaks*, so the Cooper link lives in the subtext without using "Cooper" or "Time Cube."
+- Replaces the working name Damn Fine Delay (also decided 2026-11-06). The code, UI and docs use the new names.
+- **Identity:** bundle and CLAP ID `com.firewalkaudio.redroomdelay`, manufacturer code `Fwau`, plug-in code `Rr16`.
 - **Optional subtitle:** "Model 1416," after the 14 and 16 ms lines and echoing the original's "920-16."
 - **Branding guardrails:**
   - Don't use "Twin Peaks," character names, show logos, fonts, imagery, or theme music.
-  - Keep any coffee or diner styling generic.
+  - Keep any red-room, coffee or diner styling generic.
   - Refer to the hardware only descriptively.
 - **To do before launch:**
-  - Search USPTO trademarks in the music software and audio equipment classes.
+  - Search USPTO trademarks for "Red Room" and "Firewalk" in the music software and audio equipment classes.
   - Secure the domain and social handles.
-  - A quick product search on 2026-11-06 found no existing plugin or pedal with this name.
+  - A quick web search on 2026-11-06 found no plug-in called Red Room Delay and no company called Firewalk Audio. Nearby names: Channel Robot's FireWalker synth plug-in and bdEnergy's RumbleRoom delay.
 - **Shortlist kept as alternates:** Diane, Air Walk With Me, Trust No Hose, Spooky Action.

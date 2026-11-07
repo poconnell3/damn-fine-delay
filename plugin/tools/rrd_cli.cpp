@@ -1,7 +1,7 @@
 // Offline renderer for null tests against the Python reference.
-//   dfd_cli ir <fs> <oversampling> <A|B> <widener|dual|cascade> <echo 0|1> <seconds> <out.f64>
+//   rrd_cli ir <fs> <oversampling> <A|B> <widener|dual|cascade> <echo 0|1> <seconds> <out.f64>
 //     Writes left then right (float64) impulse responses, aligned so sample 0 = the impulse.
-//   dfd_cli wav <fs> <oversampling> <A|B> <widener|dual|cascade> <driveDb> <mix> <in.f64> <out.f64>
+//   rrd_cli wav <fs> <oversampling> <A|B> <widener|dual|cascade> <driveDb> <mix> <in.f64> <out.f64>
 //     Processes a mono float64 file through the full engine (nonlinear, noise, crosstalk on).
 #include <cstdio>
 #include <cstdlib>
@@ -11,7 +11,7 @@
 
 #include "Engine.h"
 
-using namespace dfd;
+using namespace rrd;
 
 namespace
 {
@@ -108,6 +108,6 @@ int main (int argc, char** argv)
         }
         return writeFile (argv[9], l, r) ? 0 : 1;
     }
-    std::fprintf (stderr, "usage: see the comment at the top of tools/dfd_cli.cpp\n");
+    std::fprintf (stderr, "usage: see the comment at the top of tools/rrd_cli.cpp\n");
     return 2;
 }

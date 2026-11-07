@@ -26,15 +26,15 @@ inline constexpr auto humanize = "humanize";
 inline constexpr auto humanAmount = "humanAmount";
 } // namespace ParamIds
 
-class DamnFineDelayProcessor final : public juce::AudioProcessor,
+class RedRoomDelayProcessor final : public juce::AudioProcessor,
                                      private juce::AudioProcessorValueTreeState::Listener,
                                      private juce::AsyncUpdater
 {
 public:
     static constexpr int kStateVersion = 1;
 
-    DamnFineDelayProcessor();
-    ~DamnFineDelayProcessor() override;
+    RedRoomDelayProcessor();
+    ~RedRoomDelayProcessor() override;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -93,7 +93,7 @@ public:
 
 private:
     juce::AudioProcessorValueTreeState apvts;
-    dfd::Engine engine;
+    rrd::Engine engine;
     double currentRate = 0.0;
     Metering meters;
 
@@ -119,8 +119,8 @@ private:
         std::atomic<float>* humanAmount;
     } raw {};
 
-    dfd::EngineSetup currentSetup() const;
-    dfd::EngineParams currentParams() const;
+    rrd::EngineSetup currentSetup() const;
+    rrd::EngineParams currentParams() const;
     void rebuildEngine();
     std::pair<float*, float*> prepareChannels (juce::AudioBuffer<float>&);
     void meterBlock (std::array<LevelTap, 2>&, const juce::AudioBuffer<float>&, int channels) noexcept;
@@ -128,5 +128,5 @@ private:
     void parameterChanged (const juce::String& id, float) override;
     void handleAsyncUpdate() override;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DamnFineDelayProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RedRoomDelayProcessor)
 };

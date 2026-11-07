@@ -7,7 +7,7 @@
 #include <span>
 #include <vector>
 
-namespace dfd
+namespace rrd
 {
 using cplx = std::complex<double>;
 constexpr double kPi = std::numbers::pi;
@@ -330,4 +330,4 @@ double groupDelayAt (ResponseFn&& h, double freqHz)
     return -std::arg (hi / lo) / (kTwoPi * 2.0);
 }
 
-} // namespace dfd
+} // namespace rrd

@@ -2,7 +2,7 @@
 
 namespace
 {
-namespace layout = dfd::ui::layout;
+namespace layout = rrd::ui::layout;
 
 const juce::Identifier kUiScale { "uiScale" }, kMeterChannel { "meterChannel" };
 constexpr float kMinScale = 0.6f, kMaxScale = 1.6f;
@@ -22,7 +22,7 @@ juce::StringArray outputLabels (int numOut, int routing)
 }
 } // namespace
 
-DamnFineDelayEditor::DamnFineDelayEditor (DamnFineDelayProcessor& p)
+RedRoomDelayEditor::RedRoomDelayEditor (RedRoomDelayProcessor& p)
     : AudioProcessorEditor (&p),
       processor (p),
       routing (*p.state().getParameter (ParamIds::routing), { "WIDE", "DUAL", "CASCADE" })
@@ -63,7 +63,7 @@ DamnFineDelayEditor::DamnFineDelayEditor (DamnFineDelayProcessor& p)
     meterSelect.setPosition ((int) apvts.state.getProperty (kMeterChannel, 0), juce::dontSendNotification);
     meterSelect.onChange = [&apvts] (int pos) { apvts.state.setProperty (kMeterChannel, pos, nullptr); };
 
-    const std::pair<dfd::ui::ToggleSwitch*, juce::Point<int>> toggles[] = {
+    const std::pair<rrd::ui::ToggleSwitch*, juce::Point<int>> toggles[] = {
         { &color, { 0, 0 } }, { &wetOnly, { 1, 0 } }, { &noise, { 0, 1 } }, { &quality, { 1, 1 } }, { &meterSelect, { 0, 2 } }
     };
     for (auto [t, cell] : toggles)
@@ -89,13 +89,13 @@ DamnFineDelayEditor::DamnFineDelayEditor (DamnFineDelayProcessor& p)
     startTimerHz (60);
 }
 
-DamnFineDelayEditor::~DamnFineDelayEditor()
+RedRoomDelayEditor::~RedRoomDelayEditor()
 {
     stopTimer();
     face.setLookAndFeel (nullptr);
 }
 
-void DamnFineDelayEditor::addKnob (Knob& k, const char* paramId, layout::KnobSpot spot)
+void RedRoomDelayEditor::addKnob (Knob& k, const char* paramId, layout::KnobSpot spot)
 {
     const auto bounds = layout::knobBounds (spot);
     k.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, bounds.getWidth(), 16);
@@ -107,7 +107,7 @@ void DamnFineDelayEditor::addKnob (Knob& k, const char* paramId, layout::KnobSpo
         k.slider.setDoubleClickReturnValue (true, param->convertFrom0to1 (param->getDefaultValue()));
 }
 
-void DamnFineDelayEditor::showMode (bool doubler, bool human)
+void RedRoomDelayEditor::showMode (bool doubler, bool human)
 {
     // Double mode mixes with its own pan and level knobs; the normal mix controls and routing do nothing there.
     // Humanize only applies in Double mode, and its amount only while it is on.
@@ -126,7 +126,7 @@ void DamnFineDelayEditor::showMode (bool doubler, bool human)
     setActive (routing, ! doubler);
 }
 
-void DamnFineDelayEditor::resized()
+void RedRoomDelayEditor::resized()
 {
     const float scale = (float) getWidth() / (float) layout::kWidth;
     face.setBounds (0, 0, layout::kWidth, layout::kHeight);
@@ -135,7 +135,7 @@ void DamnFineDelayEditor::resized()
         processor.state().state.setProperty (kUiScale, scale, nullptr);
 }
 
-void DamnFineDelayEditor::timerCallback()
+void RedRoomDelayEditor::timerCallback()
 {
     const double now = juce::Time::getMillisecondCounterHiRes();
     const double dt = juce::jlimit (0.0, 0.1, (now - lastTickMs) / 1000.0);

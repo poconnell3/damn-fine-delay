@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace dfd
+namespace rrd
 {
 /** Per-note timing offsets for the doubled copy, applied before the tubes.
 
@@ -154,4 +154,4 @@ private:
         return (double) (rng >> 11) * (1.0 / 9007199254740992.0);
     }
 };
-} // namespace dfd
+} // namespace rrd

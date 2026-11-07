@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace dfd
+namespace rrd
 {
 namespace
 {
@@ -259,4 +259,4 @@ void Engine::process (float* left, float* right, int numSamples) noexcept
     }
 }
 
-} // namespace dfd
+} // namespace rrd

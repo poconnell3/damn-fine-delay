@@ -4,7 +4,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /** Shared look and fixed layout of the rack face. The editor is drawn at kWidth x kHeight and scaled as a whole. */
-namespace dfd::ui
+namespace rrd::ui
 {
 namespace colours
 {
@@ -100,4 +100,4 @@ namespace layout
     inline constexpr int humanizeDivider = 143;
     inline const juce::Rectangle<float> dryHeader { 117.0f, 148.0f, 70.0f, 13.0f }, wetHeader { 187.0f, 148.0f, 70.0f, 13.0f };
 } // namespace layout
-} // namespace dfd::ui
+} // namespace rrd::ui

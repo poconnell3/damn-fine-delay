@@ -1,6 +1,6 @@
 #include "Meters.h"
 
-namespace dfd::ui
+namespace rrd::ui
 {
 namespace
 {
@@ -239,7 +239,7 @@ void VuMeter::paintFace (juce::Graphics& g) const
 
     silkText (g, "VU", { f.getX() + 8.0f, f.getY() + 4.0f, 30.0f, 14.0f }, 12.0f, juce::Justification::centredLeft, ink);
     silkText (g, "VU", { f.getRight() - 38.0f, f.getY() + 4.0f, 30.0f, 14.0f }, 12.0f, juce::Justification::centredRight, ink);
-    silkText (g, "DFA", { f.getCentreX() - 30.0f, f.getY() + 64.0f, 60.0f, 14.0f }, 11.0f, juce::Justification::centred, ink.withAlpha (0.55f));
+    silkText (g, "FWA", { f.getCentreX() - 30.0f, f.getY() + 64.0f, 60.0f, 14.0f }, 11.0f, juce::Justification::centred, ink.withAlpha (0.55f));
 
     // Base plate hiding the needle pivot.
     juce::Graphics::ScopedSaveState s (g);
@@ -293,4 +293,4 @@ void VuMeter::paint (juce::Graphics& g)
         g.fillRect (f);
     }
 }
-} // namespace dfd::ui
+} // namespace rrd::ui

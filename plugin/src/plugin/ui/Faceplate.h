@@ -2,7 +2,7 @@
 
 #include "Theme.h"
 
-namespace dfd::ui
+namespace rrd::ui
 {
 /** The rack face: ears, meter bays, brushed plates, screws and all static silkscreen. Cached per pixel scale. */
 class Faceplate final : public juce::Component
@@ -43,4 +43,4 @@ private:
 
     void paintDoubler (juce::Graphics&, double msA, double msB);
 };
-} // namespace dfd::ui
+} // namespace rrd::ui

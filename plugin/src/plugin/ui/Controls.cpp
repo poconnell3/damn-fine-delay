@@ -1,6 +1,6 @@
 #include "Controls.h"
 
-namespace dfd::ui
+namespace rrd::ui
 {
 namespace
 {
@@ -407,4 +407,4 @@ void PilotLamp::paint (juce::Graphics& g)
     g.setColour (juce::Colours::white.withAlpha (lit ? 0.75f : 0.3f));
     g.fillEllipse (c.x - 3.5f, c.y - 4.0f, 2.6f, 2.0f);
 }
-} // namespace dfd::ui
+} // namespace rrd::ui

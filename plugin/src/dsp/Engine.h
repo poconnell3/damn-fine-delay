@@ -7,7 +7,7 @@
 #include "Line.h"
 #include "Oversampler.h"
 
-namespace dfd
+namespace rrd
 {
 enum class Routing { Widener, Dual, Cascade };
 
@@ -47,7 +47,7 @@ struct EngineParams
     bool crosstalk = true;
 };
 
-/** Damn Fine Delay: two acoustic lines (A = 16 ms, B = 14 ms) with the hardware's routings.
+/** Red Room Delay: two acoustic lines (A = 16 ms, B = 14 ms) with the hardware's routings.
     Base-rate stereo in/out; the lines run oversampled. Wet output is aligned to the dry path,
     and both are delayed by latencySamples(). */
 class Engine
@@ -110,4 +110,4 @@ private:
     double pushDry (double inL, double inR, double& dryR) noexcept;
 };
 
-} // namespace dfd
+} // namespace rrd

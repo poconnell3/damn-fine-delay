@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-namespace dfd
+namespace rrd
 {
 namespace
 {
@@ -308,4 +308,4 @@ double Line::process (double x, double drive, const LineSwitches& sw) noexcept
     return out / drive;
 }
 
-} // namespace dfd
+} // namespace rrd

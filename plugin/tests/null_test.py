@@ -11,7 +11,7 @@ the response up to its Nyquist frequency. Against the exact analog target at 9 k
 0.03 rad at 4x and 0.11 rad at 2x, the reference by 0.09 rad. That is under 2 us of group delay, so it is
 reported, not failed.
 
-Run:  PYTHONPATH=<prototype dir> python3 tests/null_test.py <path to dfd_cli>
+Run:  PYTHONPATH=<prototype dir> python3 tests/null_test.py <path to rrd_cli>
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-from engine import DamnFineDelay, Settings, db
+from engine import RedRoomDelay, Settings, db
 
 FS = 48000
 SECONDS = 1.0
@@ -39,7 +39,7 @@ def cpp_ir(cli: str, os_factor: int, color: str, routing: str, echo: bool) -> np
 
 
 def reference_ir(color: str, routing: str, echo: bool) -> np.ndarray:
-    eng = DamnFineDelay(FS, replace(Settings(color=color).linear(), echo=echo))
+    eng = RedRoomDelay(FS, replace(Settings(color=color).linear(), echo=echo))
     n = int(SECONDS * FS)
     x = np.zeros(n + PRE)
     x[PRE] = 1.0
@@ -81,4 +81,4 @@ def main(cli: str) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else "build/dfd_cli"))
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else "build/rrd_cli"))

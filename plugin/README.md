@@ -1,4 +1,4 @@
-# Damn Fine Delay (v0.6)
+# Red Room Delay (v0.7)
 
 A real-time plug-in model of the 1971 two-line acoustic tube delay (16 ms and 14 ms lines, 30 ms cascade). The DSP core is plain C++20 with no JUCE dependency; JUCE wraps it as VST3, AU (macOS), CLAP and Standalone.
 
@@ -10,14 +10,14 @@ cmake --build build                                            # builds and inst
 ctest --test-dir build                                         # C++ spec tests (111 checks)
 ```
 
-Each build copies the plug-ins into your user plug-in folders: on macOS `~/Library/Audio/Plug-Ins/` (`VST3`, `Components`, `CLAP`), on Linux `~/.vst3` and `~/.clap`, on Windows the VST3 goes to the Common Files `VST3` folder (needs an administrator prompt; copy the CLAP by hand). On macOS the build also restarts the Audio Unit registrar so Logic sees a rebuilt AU. Turn this off with `-DDFD_COPY_AFTER_BUILD=OFF`.
+Each build copies the plug-ins into your user plug-in folders: on macOS `~/Library/Audio/Plug-Ins/` (`VST3`, `Components`, `CLAP`), on Linux `~/.vst3` and `~/.clap`, on Windows the VST3 goes to the Common Files `VST3` folder (needs an administrator prompt; copy the CLAP by hand). On macOS the build also restarts the Audio Unit registrar so Logic sees a rebuilt AU. Turn this off with `-DRRD_COPY_AFTER_BUILD=OFF`.
 
-Options: `-DDFD_JUCE_PATH=/path/to/JUCE` uses a local JUCE checkout, `-DDFD_BUILD_CLAP=OFF` skips CLAP, `-DDFD_BUILD_PLUGIN=OFF` builds only the DSP core, tests and CLI, `-DDFD_BUILD_UI_SNAPSHOT=ON` adds `dfd_ui_snapshot`, which renders the editor to a PNG without a host. On Linux, JUCE needs the ALSA, X11, Xrandr, Xinerama, Xcursor, Xext, freetype and fontconfig development packages.
+Options: `-DRRD_JUCE_PATH=/path/to/JUCE` uses a local JUCE checkout, `-DRRD_BUILD_CLAP=OFF` skips CLAP, `-DRRD_BUILD_PLUGIN=OFF` builds only the DSP core, tests and CLI, `-DRRD_BUILD_UI_SNAPSHOT=ON` adds `rrd_ui_snapshot`, which renders the editor to a PNG without a host. On Linux, JUCE needs the ALSA, X11, Xrandr, Xinerama, Xcursor, Xext, freetype and fontconfig development packages.
 
 Null test against the Python reference (needs numpy and scipy, and the prototype folder on `PYTHONPATH`):
 
 ```
-PYTHONPATH=../research/prototype:../research/tools python3 tests/null_test.py build/dfd_cli
+PYTHONPATH=../research/prototype:../research/tools python3 tests/null_test.py build/rrd_cli
 ```
 
 ## Layout
@@ -33,7 +33,7 @@ PYTHONPATH=../research/prototype:../research/tools python3 tests/null_test.py bu
 | `src/plugin/` | JUCE processor and editor |
 | `src/plugin/ui/` | Rack face, controls (knobs, toggles, illuminated buttons, routing selector, pilot lamp) and meters |
 | `tools/gen_filters.py` | Regenerates `GeneratedFilters.h` from the schematic and the tube model |
-| `tools/dfd_cli.cpp` | Offline renderer used by the null test |
+| `tools/rrd_cli.cpp` | Offline renderer used by the null test |
 | `tools/ui_snapshot.cpp` | Renders the editor to a PNG after feeding it test audio |
 | `tests/` | C++ spec tests and the Python null test |
 
@@ -72,4 +72,4 @@ A rack panel drawn at 1384 x 330 and scaled as a whole (drag the corner; the siz
 
 ## Licensing note
 
-JUCE 8 is dual-licensed: AGPLv3, or the JUCE licence (Starter is free up to $20k a year of revenue; Indie and Pro above that). Choose before distributing. The plug-in codes in `CMakeLists.txt` (company "Damn Fine Audio", manufacturer code `Dfau`, plug-in code `Df16`) are placeholders.
+JUCE 8 is dual-licensed: AGPLv3, or the JUCE licence (Starter is free up to $20k a year of revenue; Indie and Pro above that). Choose before distributing. Identity in `CMakeLists.txt`: company "Firewalk Audio", bundle ID `com.firewalkaudio.redroomdelay`, manufacturer code `Fwau`, plug-in code `Rr16`. Changing either code makes hosts treat it as a different plug-in, so fix them before release.

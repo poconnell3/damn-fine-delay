@@ -5,7 +5,7 @@
 
 #include "Filters.h"
 
-namespace dfd
+namespace rrd
 {
 /** Linear-phase half-band FIR (Kaiser-windowed sinc). Odd length N = 4m + 3, so every other tap except the
     centre is zero and the group delay (N - 1) / 2 is an odd integer at the higher rate. */
@@ -171,4 +171,4 @@ private:
     int factorValue = 1;
 };
 
-} // namespace dfd
+} // namespace rrd

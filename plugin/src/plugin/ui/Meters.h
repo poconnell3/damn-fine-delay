@@ -4,7 +4,7 @@
 
 #include "Theme.h"
 
-namespace dfd::ui
+namespace rrd::ui
 {
 /** One or two vertical peak meters (IEC 60268-18 scale) with peak hold and clip lamps. Click to reset. */
 class LevelMeterBay final : public juce::Component
@@ -57,4 +57,4 @@ private:
     float scaleRadius() const;
     void paintFace (juce::Graphics&) const;
 };
-} // namespace dfd::ui
+} // namespace rrd::ui

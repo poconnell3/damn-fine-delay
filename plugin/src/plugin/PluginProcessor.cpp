@@ -49,7 +49,7 @@ juce::AudioParameterFloatAttributes dbAttributes()
 }
 } // namespace
 
-APVTS::ParameterLayout DamnFineDelayProcessor::createLayout()
+APVTS::ParameterLayout RedRoomDelayProcessor::createLayout()
 {
     using namespace juce;
     APVTS::ParameterLayout layout;
@@ -87,11 +87,11 @@ APVTS::ParameterLayout DamnFineDelayProcessor::createLayout()
     return layout;
 }
 
-DamnFineDelayProcessor::DamnFineDelayProcessor()
+RedRoomDelayProcessor::RedRoomDelayProcessor()
     : AudioProcessor (BusesProperties()
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts (*this, nullptr, "DamnFineDelay", createLayout())
+      apvts (*this, nullptr, "RedRoomDelay", createLayout())
 {
     raw.routing = apvts.getRawParameterValue (ParamIds::routing);
     raw.color = apvts.getRawParameterValue (ParamIds::color);
@@ -115,35 +115,35 @@ DamnFineDelayProcessor::DamnFineDelayProcessor()
     apvts.addParameterListener (ParamIds::temperature, this);
 }
 
-DamnFineDelayProcessor::~DamnFineDelayProcessor()
+RedRoomDelayProcessor::~RedRoomDelayProcessor()
 {
     cancelPendingUpdate();
     apvts.removeParameterListener (ParamIds::quality, this);
     apvts.removeParameterListener (ParamIds::temperature, this);
 }
 
-dfd::EngineSetup DamnFineDelayProcessor::currentSetup() const
+rrd::EngineSetup RedRoomDelayProcessor::currentSetup() const
 {
-    dfd::EngineSetup s;
+    rrd::EngineSetup s;
     s.oversampling = 1 << juce::jlimit (0, 2, (int) raw.quality->load());
     s.temperatureC = raw.temperature->load();
     return s;
 }
 
-dfd::EngineParams DamnFineDelayProcessor::currentParams() const
+rrd::EngineParams RedRoomDelayProcessor::currentParams() const
 {
-    dfd::EngineParams p;
-    p.routing = static_cast<dfd::Routing> (juce::jlimit (0, 2, (int) raw.routing->load()));
-    p.color = (int) raw.color->load() == 0 ? dfd::Color::A : dfd::Color::B;
+    rrd::EngineParams p;
+    p.routing = static_cast<rrd::Routing> (juce::jlimit (0, 2, (int) raw.routing->load()));
+    p.color = (int) raw.color->load() == 0 ? rrd::Color::A : rrd::Color::B;
     p.driveDb = raw.drive->load();
     p.mix = raw.wetOnly->load() >= 0.5f ? 1.0 : raw.mix->load() / 100.0;
     p.levelADb = levelDb (raw.levelA);
     p.levelBDb = levelDb (raw.levelB);
     p.outputDb = raw.output->load();
-    p.noise = static_cast<dfd::NoiseMode> (juce::jlimit (0, 2, (int) raw.noise->load()));
+    p.noise = static_cast<rrd::NoiseMode> (juce::jlimit (0, 2, (int) raw.noise->load()));
     p.doubler = raw.doubler->load() >= 0.5f;
     if (p.doubler)
-        p.routing = dfd::Routing::Cascade;
+        p.routing = rrd::Routing::Cascade;
     p.dryPan = raw.dryPan->load() / 100.0;
     p.wetPan = raw.wetPan->load() / 100.0;
     p.dryLevelDb = levelDb (raw.dryLevel);
@@ -153,7 +153,7 @@ dfd::EngineParams DamnFineDelayProcessor::currentParams() const
     return p;
 }
 
-void DamnFineDelayProcessor::prepareToPlay (double sampleRate, int)
+void RedRoomDelayProcessor::prepareToPlay (double sampleRate, int)
 {
     currentRate = sampleRate;
     meters.numIn.store (getTotalNumInputChannels());
@@ -162,7 +162,7 @@ void DamnFineDelayProcessor::prepareToPlay (double sampleRate, int)
     setLatencySamples (engine.latencySamples());
 }
 
-void DamnFineDelayProcessor::rebuildEngine()
+void RedRoomDelayProcessor::rebuildEngine()
 {
     if (currentRate <= 0.0)
         return;
@@ -172,17 +172,17 @@ void DamnFineDelayProcessor::rebuildEngine()
     suspendProcessing (false);
 }
 
-void DamnFineDelayProcessor::parameterChanged (const juce::String&, float)
+void RedRoomDelayProcessor::parameterChanged (const juce::String&, float)
 {
     triggerAsyncUpdate();
 }
 
-void DamnFineDelayProcessor::handleAsyncUpdate()
+void RedRoomDelayProcessor::handleAsyncUpdate()
 {
     rebuildEngine();
 }
 
-bool DamnFineDelayProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+bool RedRoomDelayProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     const auto in = layouts.getMainInputChannelSet(), out = layouts.getMainOutputChannelSet();
     const bool inOk = in == juce::AudioChannelSet::mono() || in == juce::AudioChannelSet::stereo();
@@ -190,7 +190,7 @@ bool DamnFineDelayProcessor::isBusesLayoutSupported (const BusesLayout& layouts)
     return inOk && outOk && ! (in == juce::AudioChannelSet::stereo() && out == juce::AudioChannelSet::mono());
 }
 
-void DamnFineDelayProcessor::LevelTap::push (const float* x, int n) noexcept
+void RedRoomDelayProcessor::LevelTap::push (const float* x, int n) noexcept
 {
     float p = 0.0f, sum = 0.0f;
     for (int i = 0; i < n; ++i)
@@ -203,7 +203,7 @@ void DamnFineDelayProcessor::LevelTap::push (const float* x, int n) noexcept
     count.fetch_add (n, std::memory_order_relaxed);
 }
 
-DamnFineDelayProcessor::LevelTap::Reading DamnFineDelayProcessor::LevelTap::take() noexcept
+RedRoomDelayProcessor::LevelTap::Reading RedRoomDelayProcessor::LevelTap::take() noexcept
 {
     const float p = peak.exchange (0.0f, std::memory_order_relaxed);
     const float sum = sumSquares.exchange (0.0f, std::memory_order_relaxed);
@@ -211,13 +211,13 @@ DamnFineDelayProcessor::LevelTap::Reading DamnFineDelayProcessor::LevelTap::take
     return { p, n > 0 ? std::sqrt (sum / (float) n) : 0.0f };
 }
 
-void DamnFineDelayProcessor::meterBlock (std::array<LevelTap, 2>& taps, const juce::AudioBuffer<float>& b, int channels) noexcept
+void RedRoomDelayProcessor::meterBlock (std::array<LevelTap, 2>& taps, const juce::AudioBuffer<float>& b, int channels) noexcept
 {
     for (int ch = 0; ch < juce::jmin (2, channels, b.getNumChannels()); ++ch)
         taps[(size_t) ch].push (b.getReadPointer (ch), b.getNumSamples());
 }
 
-std::pair<float*, float*> DamnFineDelayProcessor::prepareChannels (juce::AudioBuffer<float>& buffer)
+std::pair<float*, float*> RedRoomDelayProcessor::prepareChannels (juce::AudioBuffer<float>& buffer)
 {
     const int numIn = getTotalNumInputChannels(), numOut = getTotalNumOutputChannels();
     const int n = buffer.getNumSamples();
@@ -232,7 +232,7 @@ std::pair<float*, float*> DamnFineDelayProcessor::prepareChannels (juce::AudioBu
     return { buffer.getWritePointer (0), numOut > 1 ? buffer.getWritePointer (1) : nullptr };
 }
 
-void DamnFineDelayProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void RedRoomDelayProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
     const auto [left, right] = prepareChannels (buffer);
@@ -242,7 +242,7 @@ void DamnFineDelayProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     meters.processedBlocks.fetch_add (1, std::memory_order_relaxed);
 }
 
-void DamnFineDelayProcessor::processBlockBypassed (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void RedRoomDelayProcessor::processBlockBypassed (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
     const auto [left, right] = prepareChannels (buffer);
@@ -250,12 +250,12 @@ void DamnFineDelayProcessor::processBlockBypassed (juce::AudioBuffer<float>& buf
     meterBlock (meters.out, buffer, getTotalNumOutputChannels());
 }
 
-juce::AudioProcessorEditor* DamnFineDelayProcessor::createEditor()
+juce::AudioProcessorEditor* RedRoomDelayProcessor::createEditor()
 {
-    return new DamnFineDelayEditor (*this);
+    return new RedRoomDelayEditor (*this);
 }
 
-void DamnFineDelayProcessor::getStateInformation (juce::MemoryBlock& destData)
+void RedRoomDelayProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
     state.setProperty ("version", kStateVersion, nullptr);
@@ -263,7 +263,7 @@ void DamnFineDelayProcessor::getStateInformation (juce::MemoryBlock& destData)
         copyXmlToBinary (*xml, destData);
 }
 
-void DamnFineDelayProcessor::setStateInformation (const void* data, int sizeInBytes)
+void RedRoomDelayProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
         if (xml->hasTagName (apvts.state.getType()))
@@ -275,5 +275,5 @@ void DamnFineDelayProcessor::setStateInformation (const void* data, int sizeInBy
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return new DamnFineDelayProcessor();
+    return new RedRoomDelayProcessor();
 }
